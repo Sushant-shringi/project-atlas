@@ -128,13 +128,23 @@ class QdrantService:
             ]
         )
 
-        search_results = client.search(
-            collection_name=col_name,
-            query_vector=query_vector,
-            query_filter=retrieval_filter,
-            limit=limit,
-            with_payload=True
-        )
+        if hasattr(client, "query_points"):
+            response = client.query_points(
+                collection_name=col_name,
+                query=query_vector,
+                query_filter=retrieval_filter,
+                limit=limit,
+                with_payload=True
+            )
+            search_results = response.points
+        else:
+            search_results = client.search(
+                collection_name=col_name,
+                query_vector=query_vector,
+                query_filter=retrieval_filter,
+                limit=limit,
+                with_payload=True
+            )
 
         retrieved_chunks = []
         for hit in search_results:
