@@ -70,6 +70,8 @@ class ChatResponse(BaseModel):
     request_id: str = Field(..., description="Unique request tracking identifier")
     escalation_id: Optional[str] = Field(None, description="Escalation ticket ID if escalated")
     refusal_reason: Optional[str] = Field(None, description="Explanation if question was refused")
+    llm_mode: str = Field("fallback", description="Generation mode: 'gemini' or 'fallback'")
+    fallback_reason: Optional[str] = Field(None, description="Explanation if fallback mode was activated")
     latency_ms: int = Field(..., description="Total processing latency in milliseconds")
 
 

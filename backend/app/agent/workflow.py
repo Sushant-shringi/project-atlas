@@ -69,6 +69,8 @@ class AgentWorkflow:
                 "request_id": req_id,
                 "escalation_id": None,
                 "refusal_reason": reason,
+                "llm_mode": "deterministic",
+                "fallback_reason": None,
                 "latency_ms": latency_ms
             }
             cls._persist_message(conv_id, "user", question)
@@ -89,6 +91,8 @@ class AgentWorkflow:
                 "request_id": req_id,
                 "escalation_id": None,
                 "refusal_reason": reason,
+                "llm_mode": "deterministic",
+                "fallback_reason": None,
                 "latency_ms": latency_ms
             }
             cls._persist_message(conv_id, "user", question)
@@ -116,6 +120,8 @@ class AgentWorkflow:
                     "request_id": req_id,
                     "escalation_id": None,
                     "refusal_reason": f"Client not entitled to report {requested_rep_id}.",
+                    "llm_mode": "deterministic",
+                    "fallback_reason": None,
                     "latency_ms": latency_ms
                 }
                 cls._persist_message(conv_id, "user", question)
@@ -151,6 +157,8 @@ class AgentWorkflow:
                 "request_id": req_id,
                 "escalation_id": None,
                 "refusal_reason": None,
+                "llm_mode": "sql",
+                "fallback_reason": None,
                 "latency_ms": latency_ms
             }
             cls._persist_message(conv_id, "user", question)
@@ -185,6 +193,8 @@ class AgentWorkflow:
                     "request_id": req_id,
                     "escalation_id": esc_id,
                     "refusal_reason": "Unsupported long-term extrapolation beyond published horizon.",
+                    "llm_mode": "calculator",
+                    "fallback_reason": None,
                     "latency_ms": latency_ms
                 }
                 cls._persist_message(conv_id, "user", question)
@@ -210,6 +220,8 @@ class AgentWorkflow:
                     "request_id": req_id,
                     "escalation_id": None,
                     "refusal_reason": "Unpurchased report required for calculation (R-101).",
+                    "llm_mode": "deterministic",
+                    "fallback_reason": None,
                     "latency_ms": latency_ms
                 }
                 cls._persist_message(conv_id, "user", question)
@@ -239,6 +251,8 @@ class AgentWorkflow:
                 "request_id": req_id,
                 "escalation_id": None,
                 "refusal_reason": None,
+                "llm_mode": "calculator",
+                "fallback_reason": None,
                 "latency_ms": latency_ms
             }
             cls._persist_message(conv_id, "user", question)
@@ -268,6 +282,8 @@ class AgentWorkflow:
                         "request_id": req_id,
                         "escalation_id": None,
                         "refusal_reason": f"Client not entitled to report {r_id}.",
+                        "llm_mode": "deterministic",
+                        "fallback_reason": None,
                         "latency_ms": latency_ms
                     }
                     cls._persist_message(conv_id, "user", question)
@@ -281,12 +297,25 @@ class AgentWorkflow:
         context_str = PromptDefense.wrap_untrusted_context(retrieved_chunks)
 
         # Generate LLM Response
-        answer_text, usage_metrics = LLMService.generate_response(
+        answer_text, usage_metrics, llm_mode, fallback_reason = LLMService.generate_response(
             prompt=question,
             context_str=context_str,
             request_id=req_id,
             client_id=client_id
         )
+
+        # Output Validation by Critic: Ensure LLM did not hallucinate unverified figures
+        is_valid, validation_msg, unverified = FactCheckerCritic.validate_and_sanitize_response(answer_text, retrieved_chunks)
+        if not is_valid:
+            logger.warning(f"Critic Output Validation failed: {validation_msg}. Falling back to verified extract.")
+            fallback_ans, fallback_metrics = LLMService._fallback_response(
+                prompt=question,
+                context_str=context_str,
+                reason=f"Output validator rejected ungrounded figures: {validation_msg}"
+            )
+            answer_text = fallback_ans
+            llm_mode = "fallback"
+            fallback_reason = f"Critic rejected unverified LLM claims: {validation_msg}"
 
         # Extract Citations
         citations = FactCheckerCritic.extract_citations_from_chunks(retrieved_chunks)
@@ -327,6 +356,8 @@ class AgentWorkflow:
             "request_id": req_id,
             "escalation_id": escalation_id,
             "refusal_reason": None,
+            "llm_mode": llm_mode,
+            "fallback_reason": fallback_reason,
             "latency_ms": latency_ms
         }
 

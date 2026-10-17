@@ -97,3 +97,51 @@ class FactCheckerCritic:
             f"Critic evaluation completed: Confidence={final_score}, Escalation={requires_escalation}, Flags={flags}"
         )
         return final_score, requires_escalation, flags
+
+    @classmethod
+    def validate_and_sanitize_response(
+        cls,
+        answer_text: str,
+        retrieved_chunks: List[Dict[str, Any]]
+    ) -> Tuple[bool, str, List[str]]:
+        """
+        Validates that figures, percentages, and cited report IDs in the LLM response
+        are grounded in the authorized retrieved chunks.
+        Returns:
+            (is_valid, validation_message, unverified_items)
+        """
+        if not answer_text or not retrieved_chunks:
+            return True, "No figures to validate.", []
+
+        # Authorized report IDs
+        auth_report_ids = {c.get("report_id") for c in retrieved_chunks if c.get("report_id")}
+
+        # Check for citation of unauthorized report IDs
+        cited_report_ids = set(re.findall(r"\b(R-\d{3})\b", answer_text, re.IGNORECASE))
+        cited_report_ids = {r.upper() for r in cited_report_ids}
+        unauthorized_citations = cited_report_ids - auth_report_ids
+        if unauthorized_citations:
+            logger.warning(f"Critic rejected answer citing unauthorized report IDs: {unauthorized_citations}")
+            return False, f"Answer cites unauthorized or unretrieved reports: {unauthorized_citations}", list(unauthorized_citations)
+
+        # Build set of all numbers in authorized text
+        evidence_numbers = set()
+        for chunk in retrieved_chunks:
+            for num in re.findall(r"\b\d+(?:\.\d+)?\b", chunk.get("text", "")):
+                evidence_numbers.add(num)
+
+        # Permit common baseline years and integers
+        common_allowed = {"2024", "2025", "2026", "2027", "2028", "2029", "2030", "1", "2", "3", "4", "5", "10", "100"}
+
+        # Extract numbers attached to units in answer: e.g. "4.21 billion", "11.2%", "3.87 billion"
+        metric_matches = re.findall(r"(\d+(?:\.\d+)?)\s*(?:billion|million|trillion|%|cagr)", answer_text, re.IGNORECASE)
+        unverified_metrics = []
+        for m in metric_matches:
+            if m not in evidence_numbers and m not in common_allowed:
+                unverified_metrics.append(m)
+
+        if unverified_metrics:
+            logger.warning(f"Critic detected ungrounded figures in LLM answer: {unverified_metrics}")
+            return False, f"Answer contains unverified market figures not found in authorized evidence: {unverified_metrics}", unverified_metrics
+
+        return True, "All figures and citations verified against authorized evidence.", []

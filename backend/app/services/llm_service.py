@@ -38,39 +38,64 @@ class LLMService:
         context_str: str,
         request_id: str = "req-default",
         client_id: str = "C-01"
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> Tuple[str, Dict[str, Any], str, Optional[str]]:
         """
-        Invokes Gemini LLM with context isolation and collects token/latency metrics.
+        Invokes Gemini LLM with context bounding, timeout, exponential backoff on 429/5xx,
+        and collects real token/latency metrics. Falls back safely if Gemini is unavailable.
         Returns:
-            (answer_text, usage_metrics)
+            (answer_text, usage_metrics, llm_mode, fallback_reason)
         """
         api_key = settings.GEMINI_API_KEY
-        if not api_key or api_key == "placeholder-key":
-            logger.warning("No valid Gemini API key configured. Generating deterministic fallback response.")
-            return cls._fallback_response(prompt, context_str)
+        if not api_key or api_key in {"placeholder-key", "your_gemini_api_key_here"}:
+            reason = "No valid Gemini API key configured in environment."
+            logger.warning(reason)
+            ans, metrics = cls._fallback_response(prompt, context_str, reason=reason)
+            return ans, metrics, "fallback", reason
+
+        # Bound context length to prevent prompt bloat and enforce token budgets
+        bounded_context = context_str[:4000] if len(context_str) > 4000 else context_str
 
         start_time = time.time()
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(
-                model_name=settings.GEMINI_MODEL,
-                system_instruction=SYSTEM_INSTRUCTION
-            )
+        max_retries = 3
+        response = None
+        last_error = None
 
-            full_prompt = f"{context_str}\n\nClient Question: {prompt}\n\nPlease provide a clear, factual, and strictly cited response:"
-
-            response = model.generate_content(
-                full_prompt,
-                generation_config=genai.GenerationConfig(
-                    temperature=0.1,  # Low temperature for factual precision
-                    max_output_tokens=1024
+        for attempt in range(max_retries):
+            try:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(
+                    model_name=settings.GEMINI_MODEL,
+                    system_instruction=SYSTEM_INSTRUCTION
                 )
-            )
 
-            latency_ms = int((time.time() - start_time) * 1000)
-            answer_text = response.text if hasattr(response, "text") and response.text else "Unable to generate answer from evidence."
+                full_prompt = f"{bounded_context}\n\nClient Question: {prompt}\n\nPlease provide a clear, factual, and strictly cited response:"
 
-            # Calculate token usage
+                response = model.generate_content(
+                    full_prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=0.1,  # Low temperature for factual precision
+                        max_output_tokens=1024
+                    ),
+                    request_options={"timeout": 30}
+                )
+                break
+            except Exception as e:
+                last_error = e
+                err_msg = str(e)
+                # Check for retryable rate-limit or transient server errors
+                is_retryable = any(code in err_msg for code in ["429", "ResourceExhausted", "500", "503", "ServiceUnavailable"])
+                if is_retryable and attempt < max_retries - 1:
+                    backoff_delay = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning(f"Gemini API transient failure ({e}); retrying in {backoff_delay}s [Attempt {attempt+1}/{max_retries}]")
+                    time.sleep(backoff_delay)
+                else:
+                    break
+
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        # If a valid response was obtained from Gemini
+        if response and hasattr(response, "text") and response.text:
+            answer_text = response.text.strip()
             prompt_tokens = 0
             completion_tokens = 0
             if hasattr(response, "usage_metadata") and response.usage_metadata:
@@ -80,29 +105,35 @@ class LLMService:
             total_tokens = prompt_tokens + completion_tokens
             cost_usd = (prompt_tokens / 1_000_000.0 * GEMINI_FLASH_INPUT_PER_1M) + (completion_tokens / 1_000_000.0 * GEMINI_FLASH_OUTPUT_PER_1M)
 
-            # Record usage in database
-            cls._record_usage(request_id, client_id, settings.GEMINI_MODEL, prompt_tokens, completion_tokens, total_tokens, cost_usd)
+            # Record usage in database ONLY when provider returns real token counts
+            if total_tokens > 0:
+                cls._record_usage(request_id, client_id, settings.GEMINI_MODEL, prompt_tokens, completion_tokens, total_tokens, cost_usd)
 
-            return answer_text, {
+            metrics = {
                 "latency_ms": latency_ms,
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
                 "total_tokens": total_tokens,
-                "estimated_cost_usd": round(cost_usd, 6)
+                "estimated_cost_usd": round(cost_usd, 6),
+                "llm_mode": "gemini",
+                "fallback_reason": None
             }
+            logger.info(f"Gemini LLM synthesis succeeded: latency={latency_ms}ms, tokens={total_tokens}, cost=${cost_usd:.6f}")
+            return answer_text, metrics, "gemini", None
 
-        except Exception as e:
-            logger.error(f"Gemini API invocation error: {e}")
-            latency_ms = int((time.time() - start_time) * 1000)
-            fallback_ans, metrics = cls._fallback_response(prompt, context_str)
-            metrics["latency_ms"] = latency_ms
-            return fallback_ans, metrics
+        # Gemini failed or was rejected: trigger documented graceful fallback
+        fallback_reason = f"Gemini API invocation failed: {last_error}" if last_error else "Gemini returned empty response."
+        logger.warning(f"{fallback_reason}. Activating deterministic fallback.")
+        fallback_ans, metrics = cls._fallback_response(prompt, bounded_context, reason=fallback_reason)
+        metrics["latency_ms"] = latency_ms
+        return fallback_ans, metrics, "fallback", fallback_reason
 
     @classmethod
-    def _fallback_response(cls, prompt: str, context_str: str) -> Tuple[str, Dict[str, Any]]:
+    def _fallback_response(cls, prompt: str, context_str: str, reason: str = "Fallback mode active.") -> Tuple[str, Dict[str, Any]]:
         """
         Deterministic, grounded extraction synthesizer used when external LLM API is unavailable.
-        Extracts relevant factual market figures directly from the authorized retrieved document context.
+        Extracts verified factual market figures directly from authorized retrieved document context.
+        Token counts and cost are explicitly 0 (zero fabricated counts).
         """
         import re
 
@@ -110,12 +141,10 @@ class LLMService:
         keywords = [w.lower() for w in re.findall(r"\w+", prompt) if len(w) > 3 and w.lower() not in {"what", "which", "where", "report", "size", "market"}]
         
         extracted_facts = []
-        # Split context into lines
         for line in context_str.split("\n"):
             line_str = line.strip()
             if not line_str or line_str.startswith("<") or line_str.startswith("---") or line_str.startswith("CRITICAL") or line_str.startswith("Report ID:"):
                 continue
-            # Check if line contains relevant market figures or metadata requested in prompt
             is_relevant_data = any(term in line_str.lower() for term in [
                 "billion", "cagr", "%", "usd", "market was valued", "revenue reached",
                 "scope:", "hardware, software, and services", "41%", "38%", "represented"
@@ -130,11 +159,13 @@ class LLMService:
             answer = "The retrieved authorized evidence does not contain sufficient verified figures to fully answer this inquiry."
 
         return answer, {
-            "latency_ms": 20,
-            "prompt_tokens": len(context_str) // 4,
-            "completion_tokens": len(answer) // 4,
-            "total_tokens": (len(context_str) + len(answer)) // 4,
-            "estimated_cost_usd": 0.000035
+            "latency_ms": 15,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "estimated_cost_usd": 0.0,
+            "llm_mode": "fallback",
+            "fallback_reason": reason
         }
 
     @classmethod
