@@ -34,7 +34,7 @@ class AgentWorkflow:
         request_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Executes the Project Atlas copilot pipeline.
+        Executes the Project Atlas copilot pipeline orchestrated via LangGraph StateGraph.
         Returns the structured API response contract.
         """
         start_time = time.time()
@@ -42,328 +42,51 @@ class AgentWorkflow:
         conv_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
 
         logger.info(
-            f"Processing chat request: Client={client_id}, Question='{question}'",
+            f"Processing chat request via LangGraph: Client={client_id}, Question='{question}'",
             extra={"request_id": req_id, "client_id": client_id}
         )
 
         # Ensure conversation exists in DB
         cls._ensure_conversation(conv_id, client_id)
 
-        # Stage 1: Router
-        route, route_meta = QueryRouter.route_query(question)
-        logger.info(f"Routed question to: {route}")
+        from app.agent.langgraph_workflow import atlas_langgraph
 
-        # Refusal branch: Unsafe request (Prompt Injection / Destructive SQL)
-        if route == "unsafe":
-            latency_ms = int((time.time() - start_time) * 1000)
-            reason = route_meta.get("reason", "Request contains prohibited or unsafe directives.")
-            cls._record_audit_event(client_id, "UNSAFE_QUERY_REJECTED", {"question": question, "reason": reason})
-
-            response_data = {
-                "answer": "Security Refusal: Your query contains suspicious instructions or prohibited database operations and has been refused.",
-                "citations": [],
-                "confidence": 0.0,
-                "conflicts": [],
-                "derived_values": [],
-                "escalated": False,
-                "request_id": req_id,
-                "escalation_id": None,
-                "refusal_reason": reason,
-                "llm_mode": "deterministic",
-                "fallback_reason": None,
-                "latency_ms": latency_ms
-            }
-            cls._persist_message(conv_id, "user", question)
-            cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-            return response_data
-
-        # Refusal branch: Out of Scope
-        if route == "out_of_scope":
-            latency_ms = int((time.time() - start_time) * 1000)
-            reason = route_meta.get("reason", "Question is outside commercial market research scope.")
-            response_data = {
-                "answer": f"Out-of-Scope Notice: {reason}",
-                "citations": [],
-                "confidence": 0.0,
-                "conflicts": [],
-                "derived_values": [],
-                "escalated": False,
-                "request_id": req_id,
-                "escalation_id": None,
-                "refusal_reason": reason,
-                "llm_mode": "deterministic",
-                "fallback_reason": None,
-                "latency_ms": latency_ms
-            }
-            cls._persist_message(conv_id, "user", question)
-            cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-            return response_data
-
-        # Pre-Retrieval Entitlement Check: If query explicitly asks about a specific report ID (e.g. R-101)
-        import re
-        report_id_match = re.search(r"\b(R-\d{3})\b", question, re.IGNORECASE)
-        if report_id_match:
-            requested_rep_id = report_id_match.group(1).upper()
-            if not EntitlementService.is_report_authorized(client_id, requested_rep_id):
-                upgrade = EntitlementService.get_upgrade_path(requested_rep_id)
-                latency_ms = int((time.time() - start_time) * 1000)
-                response_data = {
-                    "answer": (
-                        f"Access Restricted: Report {requested_rep_id} ({upgrade['title']}) is a paid publication not included in your organization's active entitlements. "
-                        f"No market figures can be disclosed. To request access, visit {upgrade['upgrade_url']} or contact {upgrade['contact_email']}."
-                    ),
-                    "citations": [],
-                    "confidence": 0.0,
-                    "conflicts": [],
-                    "derived_values": [],
-                    "escalated": False,
-                    "request_id": req_id,
-                    "escalation_id": None,
-                    "refusal_reason": f"Client not entitled to report {requested_rep_id}.",
-                    "llm_mode": "deterministic",
-                    "fallback_reason": None,
-                    "latency_ms": latency_ms
-                }
-                cls._persist_message(conv_id, "user", question)
-                cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-                return response_data
-
-        # Branch: SQL Analytical Query
-        if route == "sql_analytical":
-            latency_ms = int((time.time() - start_time) * 1000)
-            if "which sector has the most reports" in question.lower():
-                sector_counts = SafeSQLTool.get_sector_report_counts()
-                top_sector = sector_counts[0]["sector"] if sector_counts else "Unknown"
-                top_count = sector_counts[0]["report_count"] if sector_counts else 0
-                answer = (
-                    f"Based on the publications catalog, the sector with the most reports is **{top_sector}** "
-                    f"with {top_count} published research reports. Breakdown across sectors: " +
-                    ", ".join([f"{s['sector']} ({s['report_count']})" for s in sector_counts]) + "."
-                )
-            else:
-                auth_info = SafeSQLTool.get_authorized_reports_count_for_client(client_id)
-                answer = (
-                    f"Client {client_id} currently has entitlement access to {auth_info['total_authorized_reports']} "
-                    f"reports: {', '.join(auth_info['report_ids'])}."
-                )
-
-            response_data = {
-                "answer": answer,
-                "citations": [{"report_id": "CATALOG-DB", "title": "CMR Reports Database", "page": 1, "scope": "Internal Catalog"}],
-                "confidence": 1.0,
-                "conflicts": [],
-                "derived_values": [],
-                "escalated": False,
-                "request_id": req_id,
-                "escalation_id": None,
-                "refusal_reason": None,
-                "llm_mode": "sql",
-                "fallback_reason": None,
-                "latency_ms": latency_ms
-            }
-            cls._persist_message(conv_id, "user", question)
-            cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-            return response_data
-
-        # Branch: Calculation & Extrapolation
-        if route == "calculation":
-            # Check for unsupported 2035 extrapolation
-            if "2035" in question:
-                is_valid, warn_msg = MarketCalculator.evaluate_extrapolation(target_year=2035, max_forecast_year=2030)
-                # Escalate to human analyst due to lack of verified forecast
-                esc_id = cls._create_escalation_ticket(
-                    client_id=client_id,
-                    conv_id=conv_id,
-                    question=question,
-                    reason="Unsupported extrapolation beyond 2030 forecast window requested.",
-                    confidence=0.35
-                )
-                latency_ms = int((time.time() - start_time) * 1000)
-                response_data = {
-                    "answer": (
-                        f"Unsupported Extrapolation Warning: The verified forecast horizon for the smart water meter market terminates in 2030. "
-                        f"Projecting to 2035 requires unverified macroeconomic modeling that exceeds published data. "
-                        f"An escalation ticket ({esc_id}) has been created for a CMR senior research analyst to prepare a custom forecast model."
-                    ),
-                    "citations": [{"report_id": "R-101", "title": "Global Smart Water Meter Market 2025", "page": 8}],
-                    "confidence": 0.35,
-                    "conflicts": [],
-                    "derived_values": [],
-                    "escalated": True,
-                    "request_id": req_id,
-                    "escalation_id": esc_id,
-                    "refusal_reason": "Unsupported long-term extrapolation beyond published horizon.",
-                    "llm_mode": "calculator",
-                    "fallback_reason": None,
-                    "latency_ms": latency_ms
-                }
-                cls._persist_message(conv_id, "user", question)
-                cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-                return response_data
-
-            # Check if client is authorized for R-101 to perform the calculation
-            is_r101_auth = EntitlementService.is_report_authorized(client_id, "R-101")
-            if not is_r101_auth:
-                latency_ms = int((time.time() - start_time) * 1000)
-                upgrade_info = EntitlementService.get_upgrade_path("R-101")
-                response_data = {
-                    "answer": (
-                        "Access Restricted: The APAC 2030 smart water meter projection is derived from report R-101 "
-                        "(Global Smart Water Meter Market 2025). Your current subscription does not include access to this paid publication. "
-                        f"Please contact {upgrade_info['contact_email']} to upgrade your license."
-                    ),
-                    "citations": [],
-                    "confidence": 0.0,
-                    "conflicts": [],
-                    "derived_values": [],
-                    "escalated": False,
-                    "request_id": req_id,
-                    "escalation_id": None,
-                    "refusal_reason": "Unpurchased report required for calculation (R-101).",
-                    "llm_mode": "deterministic",
-                    "fallback_reason": None,
-                    "latency_ms": latency_ms
-                }
-                cls._persist_message(conv_id, "user", question)
-                cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-                return response_data
-
-            # Compute the derived APAC 2030 estimate
-            calc_result = MarketCalculator.compute_apac_smart_water_meter_2030()
-            answer = (
-                f"Derived Market Projection (2030):\n"
-                f"The estimated Asia-Pacific Smart Water Meter market size in 2030 is **USD {calc_result['derived_value']} billion**.\n\n"
-                f"Methodology and Assumptions:\n"
-                f"- Base 2024 Market Size: USD 4.21 Billion (Global, R-101, p.8)\n"
-                f"- 2024 APAC Share: 38% -> Base 2024 APAC Valuation = USD {calc_result['base_value']} Billion\n"
-                f"- Growth Rate Applied: Global CAGR of 11.2% (2025–2030)\n"
-                f"- Compounding Formula: FV = 1.5998 * (1 + 0.112)^5 = USD {calc_result['derived_value']} Billion\n"
-                f"Note: This is a derived estimate based on the explicit assumption that the global 11.2% CAGR applies to the APAC regional base."
-            )
-            latency_ms = int((time.time() - start_time) * 1000)
-            response_data = {
-                "answer": answer,
-                "citations": calc_result["citations"],
-                "confidence": 0.95,
-                "conflicts": [],
-                "derived_values": [calc_result],
-                "escalated": False,
-                "request_id": req_id,
-                "escalation_id": None,
-                "refusal_reason": None,
-                "llm_mode": "calculator",
-                "fallback_reason": None,
-                "latency_ms": latency_ms
-            }
-            cls._persist_message(conv_id, "user", question)
-            cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-            return response_data
-
-        # Standard Retrieval Branch (Factual Lookup & Comparison)
-        retrieved_chunks, auth_reports, refusal = RetrievalEngine.retrieve_for_client(client_id, question, limit=5)
-
-        # Check if user asked about a specific unauthorized report that yielded no chunks
-        if not retrieved_chunks:
-            # Check if query references an unpurchased report (e.g. R-101 for C-02, or R-104)
-            for r_id in ["R-101", "R-104", "R-105", "R-106", "R-107"]:
-                if r_id.lower() in question.lower() and not EntitlementService.is_report_authorized(client_id, r_id):
-                    upgrade = EntitlementService.get_upgrade_path(r_id)
-                    latency_ms = int((time.time() - start_time) * 1000)
-                    response_data = {
-                        "answer": (
-                            f"Access Restricted: Report {r_id} ({upgrade['title']}) is a paid publication not included in your organization's active entitlements. "
-                            f"No market figures can be disclosed. To request access, visit {upgrade['upgrade_url']} or contact {upgrade['contact_email']}."
-                        ),
-                        "citations": [],
-                        "confidence": 0.0,
-                        "conflicts": [],
-                        "derived_values": [],
-                        "escalated": False,
-                        "request_id": req_id,
-                        "escalation_id": None,
-                        "refusal_reason": f"Client not entitled to report {r_id}.",
-                        "llm_mode": "deterministic",
-                        "fallback_reason": None,
-                        "latency_ms": latency_ms
-                    }
-                    cls._persist_message(conv_id, "user", question)
-                    cls._persist_message(conv_id, "assistant", response_data["answer"], response_data)
-                    return response_data
-
-        # Detect Conflicts (e.g. R-101 vs R-102)
-        conflicts = ConflictDetector.analyze_conflicts(retrieved_chunks, client_id)
-
-        # Build Untrusted Document Context
-        context_str = PromptDefense.wrap_untrusted_context(retrieved_chunks)
-
-        # Generate LLM Response
-        answer_text, usage_metrics, llm_mode, fallback_reason = LLMService.generate_response(
-            prompt=question,
-            context_str=context_str,
-            request_id=req_id,
-            client_id=client_id
-        )
-
-        # Output Validation by Critic: Ensure LLM did not hallucinate unverified figures
-        is_valid, validation_msg, unverified = FactCheckerCritic.validate_and_sanitize_response(answer_text, retrieved_chunks)
-        if not is_valid:
-            logger.warning(f"Critic Output Validation failed: {validation_msg}. Falling back to verified extract.")
-            fallback_ans, fallback_metrics = LLMService._fallback_response(
-                prompt=question,
-                context_str=context_str,
-                reason=f"Output validator rejected ungrounded figures: {validation_msg}"
-            )
-            answer_text = fallback_ans
-            llm_mode = "fallback"
-            fallback_reason = f"Critic rejected unverified LLM claims: {validation_msg}"
-
-        # Extract Citations
-        citations = FactCheckerCritic.extract_citations_from_chunks(retrieved_chunks)
-
-        # Evaluate Confidence & Fact Verification
-        confidence, requires_escalation, quality_flags = FactCheckerCritic.evaluate_confidence_and_facts(
-            question=question,
-            answer_text=answer_text,
-            retrieved_chunks=retrieved_chunks,
-            derived_values=[],
-            conflicts=conflicts
-        )
-
-        # If confidence is below threshold, create genuine escalation ticket in MySQL
-        escalation_id = None
-        if requires_escalation:
-            escalation_id = cls._create_escalation_ticket(
-                client_id=client_id,
-                conv_id=conv_id,
-                question=question,
-                reason="; ".join(quality_flags) if quality_flags else "Confidence score below required threshold.",
-                confidence=confidence
-            )
-            answer_text += (
-                f"\n\n*Notice: Due to low retrieval confidence or potential market ambiguities, an escalation ticket "
-                f"({escalation_id}) has been registered with CMR's analyst team for human review.*"
-            )
-
-        latency_ms = int((time.time() - start_time) * 1000)
-
-        response_data = {
-            "answer": answer_text,
-            "citations": citations,
-            "confidence": confidence,
-            "conflicts": conflicts,
+        initial_state = {
+            "client_id": client_id,
+            "question": question,
+            "req_id": req_id,
+            "conv_id": conv_id,
+            "start_time": start_time,
+            "citations": [],
+            "conflicts": [],
             "derived_values": [],
-            "escalated": requires_escalation,
-            "request_id": req_id,
-            "escalation_id": escalation_id,
-            "refusal_reason": None,
-            "llm_mode": llm_mode,
-            "fallback_reason": fallback_reason,
-            "latency_ms": latency_ms
+            "quality_flags": []
         }
 
-        # Persist conversation
-        cls._persist_message(conv_id, "user", question)
-        cls._persist_message(conv_id, "assistant", answer_text, response_data)
+        final_state = atlas_langgraph.invoke(initial_state)
+
+        # Record audit event if query was unsafe
+        if final_state.get("route") == "unsafe":
+            cls._record_audit_event(
+                client_id,
+                "UNSAFE_QUERY_REJECTED",
+                {"question": question, "reason": final_state.get("refusal_reason")}
+            )
+
+        response_data = {
+            "answer": final_state.get("answer", ""),
+            "citations": final_state.get("citations", []),
+            "confidence": final_state.get("confidence", 0.0),
+            "conflicts": final_state.get("conflicts", []),
+            "derived_values": final_state.get("derived_values", []),
+            "escalated": final_state.get("escalated", False),
+            "request_id": req_id,
+            "escalation_id": final_state.get("escalation_id"),
+            "refusal_reason": final_state.get("refusal_reason"),
+            "llm_mode": final_state.get("llm_mode", "fallback"),
+            "fallback_reason": final_state.get("fallback_reason"),
+            "latency_ms": final_state.get("latency_ms", int((time.time() - start_time) * 1000))
+        }
 
         return response_data
 

@@ -62,6 +62,29 @@ flowchart TB
     FastAPIApp -->|"Persist Conversation & Messages"| MySQLPrimary
 ```
 
+### LangGraph Agent Orchestration
+
+Project Atlas orchestrates query classification, entitlement checks, deterministic tools, Gemini LLM synthesis, and critic verification using a compiled **LangGraph `StateGraph`**:
+
+```mermaid
+graph TD
+    Start([User Chat Request]) --> Router["Router & Security Node<br/>• Classification<br/>• Prompt injection / SQL scan<br/>• Pre-retrieval entitlement guard"]
+    
+    Router -->|Refusal Short-Circuit| Escalation["Escalation & Persistence Node<br/>• MySQL tickets & audits<br/>• Conversation storage"]
+    Router -->|SQL Analytical| SQLTool["Safe SQL Tool Node<br/>• Read-only parameterized queries"]
+    Router -->|Calculation| Calculator["Market Calculator Node<br/>• CAGR & extrapolation formula"]
+    Router -->|Factual / Comparison| Retriever["Retriever Node<br/>• Entitlement-filtered vector search<br/>• Conflict detection (R-101 vs R-102)"]
+    
+    SQLTool --> Escalation
+    Calculator --> Critic["Critic & Fact-Checker Node<br/>• Grounding validation<br/>• Calibrated confidence scoring"]
+    Retriever -->|Unauthorized / Empty| Escalation
+    Retriever -->|Authorized Evidence| Writer["LLM Writer Node<br/>• Bounded context<br/>• Gemini Flash with retry/timeout<br/>• Graceful fallback"]
+    
+    Writer --> Critic
+    Critic --> Escalation
+    Escalation --> End([Response Contract Delivered])
+```
+
 ---
 
 ## ⚡ Quick Start (< 10 Minutes via Docker Compose)

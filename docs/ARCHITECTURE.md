@@ -58,6 +58,36 @@ flowchart TB
 
 ---
 
+## 2.1 LangGraph StateGraph Agent Workflow
+
+Project Atlas orchestrates its multi-stage cognitive pipeline using a compiled **LangGraph `StateGraph`** (`app.agent.langgraph_workflow.atlas_langgraph`). Deterministic security controls, pre-retrieval entitlement filtering, and mathematical calculations are executed by discrete, isolated nodes governed by conditional routing edges:
+
+```mermaid
+graph TD
+    Start([User Chat Request]) --> Router["Node: Router & Pre-Retrieval Defense<br/>• Query classification<br/>• Prompt injection & SQL attack scan<br/>• Pre-retrieval report entitlement check"]
+    
+    %% Conditional Routing Edges
+    Router -->|is_terminal: Refusal Short-Circuit<br/>Prompt Injection / SQL / Out-of-Scope / Unauthorized| Escalation["Node: Escalation & Persistence<br/>• Records tickets in MySQL<br/>• Persists audit & message history"]
+    Router -->|route == 'sql_analytical'| SQLTool["Node: Safe SQL Tool<br/>• Parameter-bound analytical query<br/>• Read-only MySQL connection"]
+    Router -->|route == 'calculation'| Calculator["Node: Market Calculator<br/>• Compound CAGR formula<br/>• Forecast horizon evaluation"]
+    Router -->|factual_lookup / comparison| Retriever["Node: Entitlement-Aware Retriever<br/>• Invariant report_id IN auth filter<br/>• Conflict detector (R-101 vs R-102)<br/>• Untrusted context XML wrapping"]
+    
+    %% Tool execution edges
+    SQLTool --> Escalation
+    Calculator --> Critic["Node: Fact-Checker Critic<br/>• Grounding validation (rejects hallucinations)<br/>• Confidence assessment (calibrated score)"]
+    
+    %% Retriever conditional edge
+    Retriever -->|Unauthorized specific report / empty| Escalation
+    Retriever -->|Authorized chunks found| Writer["Node: LLM Writer<br/>• Bounded context (4000 chars)<br/>• Gemini Flash with retry & timeout<br/>• Graceful deterministic fallback"]
+    
+    %% Synthesis & Verification flow
+    Writer --> Critic
+    Critic --> Escalation
+    Escalation --> End([Response Contract Delivered])
+```
+
+---
+
 ## 3. Entitlement-Aware Pre-Retrieval Pipeline
 
 The central security tenet of Project Atlas is **Pre-Retrieval Filtering**: *No unauthorized proprietary content is ever retrieved into application memory, let alone presented in prompt context to an LLM.* Relying on system prompts or post-retrieval LLM filters to maintain privacy is an architectural anti-pattern vulnerable to jailbreaks.
