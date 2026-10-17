@@ -1,0 +1,25 @@
+# SYNTHETIC ASSIGNMENT DATA - PROJECT ATLAS
+# DISCLAIMER: This document is synthetic market research generated exclusively for technical evaluation.
+# All company figures, projections, and citations are synthetic test data.
+
+=== REPORT METADATA ===
+REPORT_ID: R-107
+TITLE: Agricultural Drone & Precision Farming Report 2025
+PUBLISHER: AgriTech Review
+PUBLISHED_DATE: 2025-05-18
+SECTOR: Agriculture
+ACCESS_TYPE: paid
+SCOPE: Multispectral remote sensing and automated spray drones
+
+--- PAGE 1 ---
+EXECUTIVE SUMMARY: AGRICULTURAL DRONE & PRECISION FARMING 2025
+Global agriculture is experiencing an unprecedented shift toward automated aerial scouting and micro-targeted chemical distribution. Unmanned aerial vehicles (UAVs) equipped with multispectral, hyperspectral, and LiDAR payloads allow agronomists to detect crop water stress, nitrogen deficiency, and localized pest infestations weeks before visible symptoms appear at ground level.
+
+--- PAGE 12 ---
+MARKET VALUATION, GROWTH RATES, AND GEOGRAPHIC FOOTPRINT
+Agricultural drone hardware and analytics platforms generated USD 3.60 billion in 2024, forecast to grow at an 18.2% CAGR from 2025 to 2030. The Americas held a 45% market share in 2024, underpinned by extensive broad-acre farming in the Midwestern United States, Brazil, and Canada. 
+Heavy-payload spray drones capable of dispersing liquid fertilizers and crop protection chemicals with centimeter precision demonstrated the highest rate of capital investment among commercial farm cooperatives.
+
+--- PAGE 19 ---
+REGULATORY EVOLUTION AND AUTONOMOUS SWARM CAPABILITIES
+Aviation safety regulators in North America (FAA Part 107 beyond visual line of sight waivers) and Europe (EASA specific category rules) are increasingly granting operational clearance for autonomous multi-drone swarms operated by a single technician. Swarm autonomy increases field coverage efficiency from 30 hectares per hour to over 140 hectares per hour, drastically diminishing operational labor expenditure.

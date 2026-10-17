@@ -1,0 +1,32 @@
+# SYNTHETIC ASSIGNMENT DATA - PROJECT ATLAS
+# DISCLAIMER: This document is synthetic market research generated exclusively for technical evaluation.
+# All company figures, projections, and citations are synthetic test data.
+
+=== REPORT METADATA ===
+REPORT_ID: R-103
+TITLE: Residential Water Purifier Market 2025
+PUBLISHER: CMR
+PUBLISHED_DATE: 2025-01-22
+SECTOR: Consumer Durables
+ACCESS_TYPE: paid
+SCOPE: RO, UV, and ultrafiltration point-of-use systems
+
+--- PAGE 1 ---
+EXECUTIVE SUMMARY: RESIDENTIAL WATER PURIFIER MARKET 2025
+Consumer demand for residential water filtration has surged worldwide in response to heightened public awareness of tap water contaminants, including per- and polyfluoroalkyl substances (PFAS), microplastics, disinfection byproducts, and heavy metals. Point-of-use (POU) countertop and under-sink filtration systems represent the fastest-growing residential appliance category, driven by direct-to-consumer digital channels and subscription-based filter cartridge replacement business models.
+
+--- PAGE 5 ---
+TECHNOLOGY SEGMENTATION: REVERSE OSMOSIS VS. UV VS. GRAVITY
+Filtration technologies vary significantly across consumer price tiers and water hardness profiles:
+1. Reverse Osmosis (RO) Systems: Account for the highest value share due to multi-stage filtration capabilities that remove up to 99% of total dissolved solids (TDS). Recent product innovations have focused on improving water recovery efficiency from traditional 1:3 ratios to 1:1 permeate-to-waste ratios.
+2. Ultraviolet (UV) Disinfection: Primary technology in municipal supply zones with microbiological hazards but moderate mineral content.
+3. Gravity and Pitcher Filters: High unit volume in emerging economies where low initial capital expense is paramount.
+
+--- PAGE 11 ---
+MARKET VALUATION AND REGIONAL DISTRIBUTION
+The residential water purifier market reached USD 9.45 billion in 2024, propelled by growing consumer health awareness and municipal water quality challenges. The global market is projected to expand at a compound annual growth rate (CAGR) of 7.4% from 2025 to 2030. 
+North America accounted for 34% of global purification revenue in 2024, reflecting high purchasing power and widespread adoption of under-sink multi-stage RO units. Emerging markets across Latin America and Southeast Asia exhibit the highest percentage volume growth.
+
+--- PAGE 20 ---
+DISTRIBUTION CHANNELS AND REVENUE RESILIENCY
+The transition toward IoT-enabled smart purifiers that monitor filter membrane life and automatically reorder replacement cartridges has structurally increased recurring revenue for manufacturers. Replacement cartridge sales currently account for 42% of total manufacturer gross profit, providing resilient cash flows that buffer against cyclical economic downturns.

@@ -1,0 +1,25 @@
+# SYNTHETIC ASSIGNMENT DATA - PROJECT ATLAS
+# DISCLAIMER: This document is synthetic market research generated exclusively for technical evaluation.
+# All company figures, projections, and citations are synthetic test data.
+
+=== REPORT METADATA ===
+REPORT_ID: R-106
+TITLE: Electric Vehicle Charging Infrastructure Market 2025
+PUBLISHER: VoltMetrics
+PUBLISHED_DATE: 2025-04-01
+SECTOR: Automotive & Mobility
+ACCESS_TYPE: paid
+SCOPE: Level 2 AC and Level 3 DC fast charging hardware and networking
+
+--- PAGE 1 ---
+EXECUTIVE SUMMARY: EV CHARGING INFRASTRUCTURE MARKET 2025
+The worldwide transition toward passenger and commercial electric vehicle fleets necessitates massive capital deployment into highway fast-charging corridors and municipal urban hubs. Charge point operators (CPOs) and electric utilities are heavily investing in megawatt charging systems (MCS) and dynamic load management software to buffer local electric grid distribution constraints.
+
+--- PAGE 15 ---
+GLOBAL MARKET METRICS AND INFRASTRUCTURE PROJECTIONS
+The worldwide EV charging infrastructure market stood at USD 26.50 billion in 2024, projected to expand at an exceptional CAGR of 24.1% through 2030. Asia-Pacific commanded 48% of global market revenue in 2024, driven by aggressive public transit electrification and dense urban charging networks in mainland China, South Korea, and Japan. 
+Direct-current fast chargers (DCFC) rated at 150kW to 350kW represent the fastest revenue growth category, reflecting consumer demand for 15-minute dwell replenishment.
+
+--- PAGE 30 ---
+GRID INTEGRATION, VEHICLE-TO-GRID (V2G), AND SOFTWARE MONETIZATION
+Software and managed services represent the highest-margin frontier for EV charging networks. Automated billing interoperability via Open Charge Point Protocol (OCPP) and Open Charge Point Interface (OCPI), paired with bidirectional Vehicle-to-Grid (V2G) ancillary services, enables charge station operators to participate in grid frequency regulation markets, unlocking incremental revenue streams.
