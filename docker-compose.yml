@@ -1,0 +1,112 @@
+services:
+  # 1. Primary MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: atlas_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-atlas_root_secure_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-project_atlas}
+      MYSQL_USER: ${MYSQL_USER:-atlas_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-atlas_app_secure_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./database:/docker-entrypoint-initdb.d:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "atlas_app", "-patlas_app_secure_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - atlas_network
+
+  # 2. Qdrant Vector Store
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    container_name: atlas_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - atlas_network
+
+  # 3. Python FastAPI Copilot Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: atlas_api
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=development
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-${GENAI_API_KEY:-placeholder-key}}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=report_chunks
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=project_atlas
+      - MYSQL_USER=atlas_app
+      - MYSQL_PASSWORD=atlas_app_secure_password
+      - MYSQL_READONLY_USER=atlas_readonly
+      - MYSQL_READONLY_PASSWORD=atlas_readonly_secure_password
+      - ADMIN_API_KEY=atlas-admin-secret-key-change-in-production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./reports:/app/reports:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - atlas_network
+
+  # 4. CodeIgniter 3 Legacy Portal
+  ci3_portal:
+    build:
+      context: ./ci3_portal
+      dockerfile: Dockerfile
+    container_name: atlas_ci3_portal
+    restart: unless-stopped
+    environment:
+      - API_BASE_URL=http://api:8000
+      - CI_ENV=development
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - atlas_network
+
+volumes:
+  mysql_data:
+    driver: local
+  qdrant_data:
+    driver: local
+
+networks:
+  atlas_network:
+    driver: bridge
