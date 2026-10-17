@@ -1,0 +1,18 @@
+[project]
+name = "project-atlas"
+version = "1.0.0"
+description = "Project Atlas - Report Copilot for Legacy CI3 Portal with Entitlement-Aware RAG"
+authors = [{ name = "Sushant Shringi", email = "sushantshringi444@gmail.com" }]
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning"
+]
