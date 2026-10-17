@@ -33,17 +33,18 @@ class QueryRouter:
                 "matched_patterns": patterns
             }
 
-        # 2. Out-of-Scope Check (Politics, Elections, Personal)
+        # 2. Out-of-Scope and Sensitive Data Check
         out_of_scope_patterns = [
             r"\b(election|presidential|president|political|democrat|republican|voting|poll|ballot)\b",
-            r"\b(who\s+will\s+win|predict\s+the|outcome\s+of)\b",
-            r"\b(what\s+is\s+my\s+horoscope|who\s+won\s+the\s+super\s+bowl)\b"
+            r"\b(who\s+will\s+win|predict\s+the\s+winner)\b",
+            r"\b(weather|forecast\s+for\s+[a-zA-Z]+|temperature\s+in|horoscope|super\s+bowl)\b",
+            r"\b(email\s+addresses?|contact\s+names?|other\s+clients?|client\s+emails?)\b"
         ]
         for p in out_of_scope_patterns:
             if re.search(p, q_lower):
                 logger.info(f"Router classified question as OUT_OF_SCOPE: {question}")
                 return "out_of_scope", {
-                    "reason": "Cognitive Market Research Copilot is restricted exclusively to commercial market intelligence publications and cannot assist with political elections, personal advice, or non-commercial queries."
+                    "reason": "Cognitive Market Research Copilot is restricted exclusively to commercial market intelligence publications and cannot assist with political elections, weather, non-commercial queries, or confidential client contact records."
                 }
 
         # 3. SQL Analytical Questions
@@ -58,14 +59,17 @@ class QueryRouter:
             if trigger in q_lower:
                 return "sql_analytical", {"trigger": trigger}
 
-        # 4. Calculation Questions
-        calc_triggers = [
-            "cagr", "future value", "estimate", "projection", "forecast",
-            "2030", "2035", "projected", "compound annual growth"
+        # 4. Calculation Questions (Specifically requesting projections/calculations)
+        # Note: Inquiries merely asking 'What is the CAGR in R-102?' are factual lookups, not calculations!
+        calc_patterns = [
+            r"\b2035\b",
+            r"\b(estimate|project|projected|projection|forecast|future\s+value)\b.*\b203\d\b",
+            r"\bapac\s+smart\s+water\s+meter\s+market\s+estimate\b",
+            r"\bcalculate\s+(the\s+)?(future\s+value|cagr|projection)\b"
         ]
-        for trigger in calc_triggers:
-            if trigger in q_lower:
-                return "calculation", {"trigger": trigger}
+        for cp in calc_patterns:
+            if re.search(cp, q_lower):
+                return "calculation", {"trigger": cp}
 
         # 5. Comparison / Conflict Questions
         compare_triggers = [

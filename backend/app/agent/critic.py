@@ -51,9 +51,19 @@ class FactCheckerCritic:
         score = 1.0
         flags = []
 
+        # Check if retrieved chunks actually address the specific topic of the question
+        q_words = set(re.findall(r"\w+", question.lower()))
+        combined_text = " ".join([c.get("text", "").lower() for c in retrieved_chunks])
+        # Find material topic words (>5 chars) in question
+        topic_words = [w for w in q_words if len(w) > 5 and w not in {"market", "global", "report", "growth", "valuation", "projected"}]
+        overlap = [w for w in topic_words if w in combined_text]
+        if topic_words and len(overlap) == 0 and not derived_values:
+            score = 0.40
+            flags.append("Retrieved documents do not contain evidence for query topic (obscure or missing concept).")
+
         # If answer indicates refusal or unable to find
-        if "unable to" in answer_text.lower() or "not authorized" in answer_text.lower():
-            score = 0.50
+        if "unable to" in answer_text.lower() or "not authorized" in answer_text.lower() or "does not contain" in answer_text.lower():
+            score = 0.45
             flags.append("Insufficient evidence or restricted report.")
 
         # If no chunks were retrieved
