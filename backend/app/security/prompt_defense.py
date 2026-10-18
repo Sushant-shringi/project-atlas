@@ -10,9 +10,11 @@ from app.core.logging_config import logger
 # Signatures for known prompt-injection attempts and system prompt override attacks
 SUSPICIOUS_PATTERNS = [
     re.compile(r"disregard\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
-    re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
+    re.compile(r"ignore\s+(all\s+)?(previous|prior)?\s*instructions", re.IGNORECASE),
     re.compile(r"note\s+to\s+ai\s+systems?", re.IGNORECASE),
     re.compile(r"print\s+the\s+full\s+contents?\s+of\s+(the\s+)?clients?\s+table", re.IGNORECASE),
+    re.compile(r"(list|dump|show|reveal|print|get)\s+(all\s+)?(client\s+)?emails?", re.IGNORECASE),
+    re.compile(r"(list|dump|show|reveal|print)\s+(all\s+)?clients?", re.IGNORECASE),
     re.compile(r"system\s+prompt\s+override", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+in\s+DAN\s+mode", re.IGNORECASE),
     re.compile(r"repeat\s+(your\s+)?(system\s+prompt|developer\s+instructions|instructions)", re.IGNORECASE),

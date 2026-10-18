@@ -35,16 +35,16 @@ class QueryRouter:
 
         # 2. Out-of-Scope and Sensitive Data Check
         out_of_scope_patterns = [
-            r"\b(election|presidential|president|political|democrat|republican|voting|poll|ballot)\b",
-            r"\b(who\s+will\s+win|predict\s+the\s+winner)\b",
-            r"\b(weather|forecast\s+for\s+[a-zA-Z]+|temperature\s+in|horoscope|super\s+bowl)\b",
+            r"\b(election|presidential|president|political|politics|democrat|republican|voting|poll|ballot|prime\s+minister|candidate)\b",
+            r"\b(who\s+will\s+win|predict\s+the\s+winner|who\s+is\s+winning)\b",
+            r"\b(weather|forecast\s+for\s+[a-zA-Z]+|temperature\s+in|horoscope|super\s+bowl|sports|football)\b",
             r"\b(email\s+addresses?|contact\s+names?|other\s+clients?|client\s+emails?)\b"
         ]
         for p in out_of_scope_patterns:
             if re.search(p, q_lower):
                 logger.info(f"Router classified question as OUT_OF_SCOPE: {question}")
                 return "out_of_scope", {
-                    "reason": "Cognitive Market Research Copilot is restricted exclusively to commercial market intelligence publications and cannot assist with political elections, weather, non-commercial queries, or confidential client contact records."
+                    "reason": "Project Atlas Copilot is restricted exclusively to commercial market intelligence publications and cannot assist with political elections, weather, non-commercial queries, or confidential client contact records."
                 }
 
         # 3. SQL Analytical Questions
@@ -65,6 +65,8 @@ class QueryRouter:
             r"\b2035\b",
             r"\b(estimate|project|projected|projection|forecast|future\s+value|calculate)\b.*\b203\d\b",
             r"\bcalculate\b.*\b(projection|estimate|forecast|cagr|future\s+value)\b",
+            r"\b(apac|asia-pacific|asia\s+pacific)\b.*\b(2030|2029|2031)\b",
+            r"\b(2030|2029|2031)\b.*\b(apac|asia-pacific|asia\s+pacific)\b",
             r"\bapac\s+smart\s+water\s+meter\s+(market\s+)?(estimate|projection)\b",
         ]
         for cp in calc_patterns:

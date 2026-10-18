@@ -65,14 +65,6 @@ class AgentWorkflow:
 
         final_state = atlas_langgraph.invoke(initial_state)
 
-        # Record audit event if query was unsafe
-        if final_state.get("route") == "unsafe":
-            cls._record_audit_event(
-                client_id,
-                "UNSAFE_QUERY_REJECTED",
-                {"question": question, "reason": final_state.get("refusal_reason")}
-            )
-
         response_data = {
             "answer": final_state.get("answer", ""),
             "citations": final_state.get("citations", []),

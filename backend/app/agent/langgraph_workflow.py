@@ -78,11 +78,32 @@ def node_router(state: AgentState) -> Dict[str, Any]:
     # 2. Refusal branch: Unsafe request (Prompt Injection / Destructive SQL)
     if route == "unsafe":
         reason = route_meta.get("reason", "Request contains suspicious prompt injection patterns or destructive database directives.")
+        # Record security audit event in MySQL
+        try:
+            import json
+            sql = "INSERT INTO audit_events (client_id, event_type, details) VALUES (?, ?, ?)"
+            conn = DatabaseManager.get_connection()
+            if not hasattr(conn, "row_factory"):
+                sql = sql.replace("?", "%s")
+            audit_details = {
+                "security_flag": "PROMPT_INJECTION_DETECTED",
+                "matched_patterns": route_meta.get("matched_patterns", []),
+                "question": question,
+                "reason": reason
+            }
+            DatabaseManager.execute_commit(sql, (client_id, "PROMPT_INJECTION_DETECTED", json.dumps(audit_details)))
+            logger.warning(
+                f"Security event recorded in audit_events for client {client_id}: {audit_details}",
+                extra={"security_flag": "PROMPT_INJECTION_DETECTED", "client_id": client_id}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to record audit event: {e}")
+
         return {
             "route": route,
             "route_meta": route_meta,
             "is_terminal": True,
-            "answer": "Security Refusal: Your query contains suspicious instructions or prohibited database operations and has been refused.",
+            "answer": "Security Policy Violation: Your request contains suspicious prompt injection instructions or prohibited database operations and has been rejected by Project Atlas security controls.",
             "citations": [],
             "confidence": 0.0,
             "conflicts": [],
@@ -95,12 +116,21 @@ def node_router(state: AgentState) -> Dict[str, Any]:
 
     # 3. Refusal branch: Out of Scope
     if route == "out_of_scope":
-        reason = route_meta.get("reason", "Cognitive Market Research Copilot is restricted exclusively to commercial market intelligence publications and cannot assist with political elections, weather, non-commercial queries, or confidential client contact records.")
+        reason = route_meta.get("reason", "Project Atlas Copilot is dedicated exclusively to commercial market intelligence publications and industry research.")
+        answer = (
+            f"Out-of-Scope Notice: {reason}\n\n"
+            f"As an enterprise market research assistant, I cannot assist with political elections, forecasting voting outcomes, weather, or non-commercial inquiries.\n\n"
+            f"Here are example questions you can explore across our research publications:\n"
+            f"• **Market Sizing:** *'What was the global smart water meter market size in 2024?'*\n"
+            f"• **Catalog Analytics:** *'Which sector has the most reports?'*\n"
+            f"• **Methodology Comparison:** *'Which report should I trust regarding smart water meters?'*\n"
+            f"• **Financial Extrapolation:** *'What is the projected 2030 market size for smart water meters in Asia-Pacific?'*"
+        )
         return {
             "route": route,
             "route_meta": route_meta,
             "is_terminal": True,
-            "answer": f"Out-of-Scope Notice: {reason}",
+            "answer": answer,
             "citations": [],
             "confidence": 0.0,
             "conflicts": [],
@@ -234,24 +264,38 @@ def node_sql_tool(state: AgentState) -> Dict[str, Any]:
     client_id = state["client_id"]
 
     if "which sector has the most reports" in question.lower():
+        sql_query = (
+            "SELECT sector, COUNT(*) as report_count\n"
+            "FROM reports\n"
+            "GROUP BY sector\n"
+            "ORDER BY report_count DESC\n"
+            "LIMIT 50;"
+        )
         sector_counts = SafeSQLTool.get_sector_report_counts()
         top_sector = sector_counts[0]["sector"] if sector_counts else "Unknown"
         top_count = sector_counts[0]["report_count"] if sector_counts else 0
+        breakdown = ", ".join([f"{s['sector']} ({s['report_count']})" for s in sector_counts])
         answer = (
-            f"Based on the publications catalog, the sector with the most reports is **{top_sector}** "
-            f"with {top_count} published research reports. Breakdown across sectors: " +
-            ", ".join([f"{s['sector']} ({s['report_count']})" for s in sector_counts]) + "."
+            f"Based on the publications catalog database, the sector with the most published reports is **{top_sector}** "
+            f"with {top_count} research reports.\n\n"
+            f"Sector Breakdown:\n"
+            f"{breakdown}.\n\n"
+            f"Executed Parameterized SQL (Read-Only Analytical Tool):\n"
+            f"```sql\n{sql_query}\n```"
         )
     else:
+        sql_query = "SELECT report_id FROM report_entitlements WHERE client_id = %s AND access_granted = 1;"
         auth_info = SafeSQLTool.get_authorized_reports_count_for_client(client_id)
         answer = (
             f"Client {client_id} currently has entitlement access to {auth_info['total_authorized_reports']} "
-            f"reports: {', '.join(auth_info['report_ids'])}."
+            f"reports: {', '.join(auth_info['report_ids'])}.\n\n"
+            f"Executed Parameterized SQL (Read-Only Analytical Tool):\n"
+            f"```sql\n{sql_query}\n```"
         )
 
     return {
         "answer": answer,
-        "citations": [{"report_id": "CATALOG-DB", "title": "CMR Reports Database", "page": 1, "scope": "Internal Catalog"}],
+        "citations": [{"report_id": "CATALOG-DB", "title": "MySQL Reports Catalog (Read-Only Analytical Database)", "page": 1, "scope": "Internal Catalog"}],
         "confidence": 1.0,
         "conflicts": [],
         "derived_values": [],
