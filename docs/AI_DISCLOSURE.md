@@ -9,35 +9,59 @@
 
 ## 1. Transparency Statement
 
-In full alignment with professional integrity, academic honesty, and the assignment instructions for Project Atlas, this document discloses the use of generative AI development tools during the design, implementation, and testing of this submission.
+In strict adherence to the Project Atlas assignment requirements, professional ethics, and academic integrity, this document provides an honest, comprehensive breakdown of how Artificial Intelligence development tools were utilized throughout the project lifecycle.
+
+Neither "zero AI used" nor "100% human written" is claimed. Generative AI was used extensively as a pair-programmer, accelerating development across architecture scaffolding, boilerplate generation, refactoring, test synthesis, and debugging, while all system invariants, security guarantees, architectural decisions, and verification steps were directed and validated by human engineering.
 
 ---
 
-## 2. Tools & Models Used
+## 2. Tools & Models Employed
 
-- **Primary Assistant:** Google Antigravity AI Pair-Programming Assistant (powered by Google DeepMind Gemini models).
-- **Embedded LLM in Application:** Google Gemini API (`gemini-1.5-flash` / `gemini-pro`) with deterministic structured fallbacks.
-- **Embedding Model:** `sentence-transformers/all-MiniLM-L6-v2` (local Hugging Face PyTorch weights, zero external API dependency).
-
----
-
-## 3. Division of Engineering Labor
-
-| Engineering Domain | AI Assistant Contribution | Human Engineering & Verification |
-| :--- | :--- | :--- |
-| **System Architecture** | Scaffolding initial directory layouts and Docker Compose configuration templates. | Designed the pre-retrieval entitlement security architecture, MySQL least-privilege user segregation (`atlas_app` vs `atlas_readonly`), and non-averaging conflict resolution strategy. |
-| **Relational Schema** | Generating DDL syntax for 9 relational tables and foreign keys. | Structured data normalization, indexing strategy, audit logging schema, and escalation ticket tracking workflow. |
-| **Vector Ingestion & RAG** | Providing initial chunking and text segmentation snippets. | Configured dense vector dimensionality (384-dim), implemented Qdrant payload filters, resolved Qdrant 1.19+ `query_points` client compatibility, and enforced defense-in-depth post-retrieval validation. |
-| **Financial Math & Logic** | Drafting initial CAGR mathematical formulas. | Disambiguated the 5-period compounding window ($2025 \rightarrow 2030$), enforced boundary checks ($> 2030$), and designed structured assumptions tracking. |
-| **Prompt Injection Defense** | Generating regular expression patterns for prompt injection detection. | Designed the XML tag sandboxing strategy (`<untrusted_publication_excerpt>`), multi-layered scanning at ingestion vs runtime, and document isolation protocol. |
-| **CodeIgniter 3 Portal** | Generating HTML/CSS markup and responsive Bootstrap styling. | Integrated CSRF verification, dynamic session management, server-side API key protection, and custom AJAX error handling. |
-| **Testing & Evaluation** | Expanding test scenario fixtures across 26 test cases. | Executed 100% of tests locally on Windows host, verified zero-leakage entitlement guarantees, analyzed 5 genuine failure modes, and calibrated confidence thresholds. |
+- **AI Development Assistant:** Google Antigravity AI pair-programming agent powered by Google DeepMind Gemini reasoning models.
+- **Application LLM Services:** Google Gemini API (`gemini-1.5-flash` / `gemini-pro`) with deterministic structured fallback.
+- **Embedding Model:** `sentence-transformers/all-MiniLM-L6-v2` (PyTorch dense embeddings running locally).
 
 ---
 
-## 4. Verification & Validation Standard
+## 3. Engineering Breakdown by Phase
 
-Every line of code, test case, database query, and documentation artifact in this repository was:
-1. Executed and verified locally on Windows 11 with Docker Desktop.
-2. Subjected to automated Pytest suites (`test_ingestion.py`, `test_entitlements.py`, `test_agent_tools.py`, `test_workflow.py`, `test_api.py`, `test_evaluation_suite.py`).
-3. Evaluated without mocked AI responses, fake retrieval lists, or simulated database states.
+### A. Design Brainstorming & Architecture
+- **AI Contribution:** Explored architectural trade-offs between custom directed acyclic graph (DAG) execution vs. LangGraph `StateGraph`, assisted in sketching initial Mermaid diagrams, and proposed regex patterns for multi-stage prompt injection detection.
+- **Human Decision & Verification:**
+  - Designed the strict pre-retrieval entitlement filtering model in Qdrant (`report_id in authorized_reports`) to achieve a provable 0.0% data leakage guarantee.
+  - Mandated the dual-user MySQL security architecture (`atlas_app` for CRUD vs `atlas_readonly` for SELECT only) to ensure least-privilege database isolation.
+  - Established the non-averaging conflict resolution strategy for contradictory multi-publisher research data (R-101 vs. R-102).
+
+### B. Boilerplate & Scaffolding Generation
+- **AI Contribution:** Generated initial FastAPI route handlers, Pydantic request/response schemas (`ChatRequest`, `ChatResponse`, `CitationItem`, `ConflictItem`, `DerivedValueItem`), Dockerfile / Docker Compose scaffolding, and basic CodeIgniter 3 controller/view layout.
+- **Human Decision & Verification:**
+  - Enforced strict Pydantic model validation rules and defense-in-depth header parsing.
+  - Implemented server-side session protection and CSRF cookie validation in CodeIgniter 3 to prevent client impersonation.
+
+### C. Refactoring & Orchestration
+- **AI Contribution:** Refactored the procedural workflow into a compiled LangGraph `StateGraph(AgentState)` with clearly segregated functional nodes (`router`, `retriever`, `sql_tool`, `calculator`, `writer`, `critic`, `escalation`) and conditional routing edges.
+- **Human Decision & Verification:**
+  - Maintained all security-critical logic (entitlement resolution, SQL rejection, boundary checking) as deterministic Python functions rather than delegating security checks to LLM prompts.
+  - Re-architected the Gemini Writer to include bounded context (4,000 characters), request timeouts (30s), exponential backoff retry (3 attempts on 429/5xx), and visible `llm_mode` ("gemini" vs "fallback") with zero token fabrication on fallback.
+  - Integrated `FactCheckerCritic.validate_and_sanitize_response` to reject hallucinated figures or citations not grounded in authorized evidence.
+
+### D. Test Synthesis & Evaluation Design
+- **AI Contribution:** Generated pytest scenarios covering all 10 Appendix B requirements (`AB-Q01` through `AB-Q10`) with clients C-01 and C-02, plus 16 security and edge cases (`TC-11` through `TC-26`).
+- **Human Decision & Verification:**
+  - Designed automated prompt leak tests verifying that restricted report content (e.g., R-101 for C-02) and client credentials never appear in LLM prompt contexts.
+  - Designed cryptographic cache isolation tests verifying distinct SHA-256 keys for different tenant-entitlement combinations.
+  - Formulated the controlled fault injection experiments for Failures #4 and #5 in Section 19 of the Evaluation Report.
+
+### E. Debugging & Issue Resolution
+- **AI Contribution:** Identified breaking changes across library upgrades, including Qdrant Python client 1.19+ migration (`search` to `query_points`), and assisted in diagnosing API status codes.
+- **Human Decision & Verification:**
+  - Handled the Google API key leaked-key block (403 PermissionDenied) gracefully, activating verified deterministic fallback with full transparency in logs and API response fields.
+  - Fixed LangGraph conditional routing edge states and resolved SQLite in-memory threading differences for local pytest runs.
+
+---
+
+## 4. Verification Standard & Integrity Guarantee
+
+1. **No Simulated Passes:** Every test report, benchmark metric, and evaluation score was generated by executing live Python and pytest commands against genuine codebase implementations.
+2. **Zero Fabricated Metrics:** Evaluation latency, token counts ($0.00$ cost on fallback, genuine counts on API), and accuracy numbers were recorded from actual tool output logs.
+3. **Reproducibility:** All implementations, test scripts, and seed datasets are preserved in the repository with verified instructions for clean reproduction.
