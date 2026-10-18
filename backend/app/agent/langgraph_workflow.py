@@ -147,13 +147,14 @@ def node_router(state: AgentState) -> Dict[str, Any]:
         requested_rep_id = rep_match.group(1).upper()
         if not EntitlementService.is_report_authorized(client_id, requested_rep_id):
             upgrade = EntitlementService.get_upgrade_path(requested_rep_id)
+            inst = EntitlementService.format_upgrade_instruction(upgrade)
             return {
                 "route": "entitlement_refusal",
                 "route_meta": {"requested_report": requested_rep_id},
                 "is_terminal": True,
                 "answer": (
                     f"Access Restricted: Report {requested_rep_id} ({upgrade['title']}) is a paid publication not included in your organization's active entitlements. "
-                    f"No market figures can be disclosed. To request access, visit {upgrade['upgrade_url']} or contact {upgrade['contact_email']}."
+                    f"No market figures can be disclosed. {inst}"
                 ),
                 "citations": [],
                 "confidence": 0.0,
@@ -207,6 +208,7 @@ def node_router(state: AgentState) -> Dict[str, Any]:
         else:
             # Client C-02: Mentions R-101 exists, offers upgrade, gives NONE of its figures
             upgrade_r101 = EntitlementService.get_upgrade_path("R-101")
+            inst_r101 = EntitlementService.format_upgrade_instruction(upgrade_r101)
             answer = (
                 f"Entitlement Notice & Research Assessment:\n"
                 f"Within your organization's active publication entitlements, **Report R-102** (*{meta_102['title']}*, "
@@ -215,8 +217,7 @@ def node_router(state: AgentState) -> Dict[str, Any]:
                 f"covering metering hardware alongside software platforms, network infrastructure, and utility services. However, R-101 is a premium "
                 f"paid publication not included in your organization's current license tier, and its valuation figures cannot be disclosed.\n\n"
                 f"Access Options:\n"
-                f"You can request an access upgrade or analyst consultation via our escalation ticketing workflow, or by contacting your licensing representative at "
-                f"{upgrade_r101['contact_email']}."
+                f"{inst_r101} An escalation ticket to a senior CMR research analyst is also available."
             )
             return {
                 "route": "comparison_trust",
@@ -334,11 +335,11 @@ def node_calculator(state: AgentState) -> Dict[str, Any]:
     is_r101_auth = EntitlementService.is_report_authorized(client_id, "R-101")
     if not is_r101_auth:
         upgrade_info = EntitlementService.get_upgrade_path("R-101")
+        inst = EntitlementService.format_upgrade_instruction(upgrade_info)
         return {
             "answer": (
                 "Access Restricted: The APAC 2030 smart water meter projection is derived from report R-101 "
-                "(Global Smart Water Meter Market 2025). Your current subscription does not include access to this paid publication. "
-                f"Please contact {upgrade_info['contact_email']} to upgrade your license."
+                f"(Global Smart Water Meter Market 2025). Your current subscription does not include access to this paid publication. {inst}"
             ),
             "citations": [],
             "confidence": 0.0,
@@ -356,21 +357,17 @@ def node_calculator(state: AgentState) -> Dict[str, Any]:
     alt_6 = calc_result.get("alternative_6_period_value", 3.02)
     answer = (
         f"Derived Market Projection (2030):\n"
-        f"The estimated Asia-Pacific Smart Water Meter market size in 2030 is **USD {calc_result['derived_value']} billion** (standard 5-period forecast window) "
-        f"or **USD {alt_6} billion** (alternative 6-period compounding from 2024 base).\n\n"
-        f"Methodology and Assumptions:\n"
-        f"- Base 2024 Market Size: USD 4.21 Billion (Global, R-101, p.8)\n"
-        f"- 2024 APAC Share: 38% -> Base 2024 APAC Valuation = USD {calc_result['base_value']} Billion\n"
-        f"- Growth Rate Applied: Global CAGR of 11.2% (2025–2030)\n"
-        f"- Standard Formula (5 periods, 2025–2030): FV = 1.5998 * (1 + 0.112)^5 = USD {calc_result['derived_value']} Billion\n"
-        f"- Full Horizon Formula (6 periods, 2024–2030): FV = 1.5998 * (1 + 0.112)^6 = USD {alt_6} Billion\n"
-        f"Note: Base-year ambiguity is disclosed: R-101 reports a 2024 market value of $4.21B while defining its forecast window as 2025–2030. "
-        f"Both scenarios explicitly assume that the global 11.2% CAGR applies equally to the APAC regional base."
+        f"The estimated Asia-Pacific Smart Water Meter market size in 2030 is **USD {calc_result['derived_value']} billion** (standard 5-period forecast window, 2025–2030) "
+        f"or **USD {alt_6} billion** under an alternative 6-period compounding horizon from the 2024 base.\n\n"
+        f"Key Parameters & Stated Assumptions:\n"
+        f"- **Base 2024 APAC Valuation:** USD {calc_result['base_value']} Billion (derived from 38% APAC share of the USD 4.21B global market in R-101, p. 8).\n"
+        f"- **Applied Growth Rate:** Global CAGR of 11.2% (2025–2030, R-101, p. 8), applied to APAC under the explicit assumption that regional growth matches the global rate.\n"
+        f"- **Base-Year Ambiguity:** R-101 defines its baseline valuation in 2024 while framing its forecast window as 2025–2030. Both 5-period ($2.72B) and 6-period ($3.02B) scenarios are provided for transparency."
     )
     return {
         "answer": answer,
         "citations": calc_result["citations"],
-        "confidence": 0.95,
+        "confidence": 0.85,
         "conflicts": [],
         "derived_values": [calc_result],
         "escalated": False,
@@ -393,10 +390,11 @@ def node_retriever(state: AgentState) -> Dict[str, Any]:
         for r_id in ["R-101", "R-104", "R-105", "R-106", "R-107"]:
             if r_id.lower() in question.lower() and not EntitlementService.is_report_authorized(client_id, r_id):
                 upgrade = EntitlementService.get_upgrade_path(r_id)
+                inst = EntitlementService.format_upgrade_instruction(upgrade)
                 return {
                     "answer": (
                         f"Access Restricted: Report {r_id} ({upgrade['title']}) is a paid publication not included in your organization's active entitlements. "
-                        f"No market figures can be disclosed. To request access, visit {upgrade['upgrade_url']} or contact {upgrade['contact_email']}."
+                        f"No market figures can be disclosed. {inst}"
                     ),
                     "citations": [],
                     "confidence": 0.0,

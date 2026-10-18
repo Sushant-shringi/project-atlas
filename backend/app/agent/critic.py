@@ -148,6 +148,11 @@ class FactCheckerCritic:
                 score = min(score, 0.80)
                 flags.append("Confidence adjusted to 0.80 due to single-source visibility (unpurchased comprehensive study exists).")
 
+        # Confidence Policy Rule 3: Derived calculations resting on regional growth rate assumptions
+        if derived_values:
+            score = min(score, 0.85)
+            flags.append("Confidence adjusted to 0.85 for derived projection resting on regional growth rate assumptions.")
+
         # Clamp score between 0.0 and 1.0
         final_score = max(0.0, min(1.0, round(score, 2)))
         requires_escalation = (final_score < settings.CONFIDENCE_THRESHOLD)
