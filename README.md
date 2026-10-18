@@ -5,7 +5,7 @@
 [![MySQL 8.0](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://www.mysql.com/)
 [![Qdrant](https://img.shields.io/badge/Qdrant-v1.12-red.svg)](https://qdrant.tech/)
 [![CodeIgniter 3](https://img.shields.io/badge/CodeIgniter-3.1.13-firebrick.svg)](https://codeigniter.com/)
-[![Tests](https://img.shields.io/badge/Tests-39%20Passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-43%20Passed-brightgreen.svg)](tests/)
 [![Entitlement Leakage](https://img.shields.io/badge/Entitlement%20Leakage-0.0%25-success.svg)](eval/)
 
 **Project Atlas** is an enterprise-grade, entitlement-aware Market Research Report Copilot engineered for **Cognitive Market Research & Consulting (CMR)** and integrated seamlessly with a legacy **CodeIgniter 3** enterprise client portal.
@@ -133,7 +133,7 @@ pip install -r backend/requirements.txt
 # 3. Copy sample environment
 cp .env.example .env
 
-# 4. Run automated test suite (39 tests)
+# 4. Run automated test suite (43 tests)
 pytest -v
 
 # 5. Run the 26-scenario evaluation benchmark suite
@@ -214,7 +214,7 @@ While Project Atlas implements multi-tier defenses against prompt injection, an 
 
 ## 🧪 Testing & Verification
 
-Run the comprehensive automated test suite across all 39 tests:
+Run the comprehensive automated test suite across all 43 tests:
 
 ```bash
 # Run all unit, integration, and security tests
