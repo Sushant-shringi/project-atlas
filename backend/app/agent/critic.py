@@ -105,7 +105,8 @@ class FactCheckerCritic:
             "market", "global", "report", "growth", "valuation", "projected", "industry",
             "revenue", "forecast", "annual", "analysis", "meters", "meter", "sensor", "sensors",
             "system", "systems", "device", "devices", "purifier", "purifiers", "about", "which",
-            "where", "state", "total"
+            "where", "state", "total", "water", "smart", "data", "utility", "utilities", "share",
+            "value", "values"
         }
         topic_words = [w for w in q_words if len(w) > 4 and w not in generic_domain_words]
         overlap = [w for w in topic_words if w in combined_text]
