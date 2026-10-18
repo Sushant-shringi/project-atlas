@@ -187,22 +187,22 @@
         <div class="side-panel">
             <div class="side-title"><i class="fa-solid fa-layer-group"></i> Active Publication Access</div>
             <ul class="report-list">
-                <li class="report-item <?php echo in_array('R-101', $client_info['purchased_reports'] ?? []) ? '' : 'unauthorized'; ?>">
-                    <strong>R-101: Global Smart Water Meter 2025</strong><br>
-                    <small>Sector: Utilities | Status: <?php echo in_array('R-101', $client_info['purchased_reports'] ?? []) ? '<span style="color:green;">Authorized</span>' : '<span style="color:red;">Restricted</span>'; ?></small>
-                </li>
-                <li class="report-item">
-                    <strong>R-102: Smart Water Metering Outlook 2024</strong><br>
-                    <small>Sector: Utilities | Status: <span style="color:orange;">Public Excerpt (pp. 1-14)</span></small>
-                </li>
-                <li class="report-item <?php echo in_array('R-103', $client_info['purchased_reports'] ?? []) ? '' : 'unauthorized'; ?>">
-                    <strong>R-103: Residential Water Purifiers 2025</strong><br>
-                    <small>Sector: Consumer Durables | Status: <span style="color:green;">Authorized</span></small>
-                </li>
-                <li class="report-item unauthorized">
-                    <strong>R-104: Industrial IoT Sensors 2025</strong><br>
-                    <small>Sector: Manufacturing | Status: <span style="color:red;">Restricted</span></small>
-                </li>
+                <?php if (!empty($catalog_reports)): ?>
+                    <?php foreach ($catalog_reports as $rep): ?>
+                        <li class="report-item <?php echo ($rep['status'] === 'restricted') ? 'unauthorized' : ''; ?>">
+                            <strong><?php echo htmlspecialchars($rep['id']); ?>: <?php echo htmlspecialchars($rep['title']); ?></strong><br>
+                            <small>Sector: <?php echo htmlspecialchars($rep['sector']); ?> | Status: 
+                                <?php if ($rep['status'] === 'authorized'): ?>
+                                    <span style="color: #16a34a; font-weight: 600;"><i class="fa-solid fa-lock-open"></i> Authorized (Full)</span>
+                                <?php elseif ($rep['status'] === 'public_excerpt'): ?>
+                                    <span style="color: #d97706; font-weight: 600;"><i class="fa-solid fa-book-open"></i> Public Excerpt (pp. 1-14)</span>
+                                <?php else: ?>
+                                    <span style="color: #dc2626;"><i class="fa-solid fa-lock"></i> Restricted</span>
+                                <?php endif; ?>
+                            </small>
+                        </li>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </ul>
         </div>
     </div>

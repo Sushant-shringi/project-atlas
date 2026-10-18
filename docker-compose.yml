@@ -97,11 +97,18 @@ services:
     restart: unless-stopped
     environment:
       - API_BASE_URL=http://api:8000
-      - CI_ENV=development
+      - CI_ENV=production
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=project_atlas
+      - MYSQL_USER=atlas_app
+      - MYSQL_PASSWORD=atlas_app_secure_password
     ports:
       - "8080:80"
     depends_on:
       api:
+        condition: service_healthy
+      mysql:
         condition: service_healthy
     networks:
       - atlas_network

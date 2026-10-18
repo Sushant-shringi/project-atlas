@@ -19,7 +19,7 @@ $config['function_trigger'] = 'm';
 $config['directory_trigger'] = 'd';
 
 $config['log_threshold'] = 1;
-$config['log_path'] = '';
+$config['log_path'] = APPPATH . 'logs/';
 $config['log_file_extension'] = '';
 $config['log_file_permissions'] = 0644;
 $config['log_date_format'] = 'Y-m-d H:i:s';
@@ -34,7 +34,7 @@ $config['encryption_key'] = 'atlas-ci3-encryption-secret-key-2026';
 $config['sess_driver'] = 'files';
 $config['sess_cookie_name'] = 'atlas_ci_session';
 $config['sess_expiration'] = 7200;
-$config['sess_save_path'] = NULL;
+$config['sess_save_path'] = sys_get_temp_dir();
 $config['sess_match_ip'] = FALSE;
 $config['sess_time_to_update'] = 300;
 $config['sess_regenerate_destroy'] = FALSE;

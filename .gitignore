@@ -46,8 +46,9 @@ qdrant_data/
 *.db
 
 # Logs
-logs/
+/logs/
 *.log
+!ci3_portal/application/logs/index.html
 
 # IDE & OS files
 .idea/

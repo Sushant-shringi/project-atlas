@@ -16,18 +16,29 @@ class Atlas_api {
     public function __construct() {
         $this->CI =& get_instance();
         $this->CI->load->config('atlas_api', TRUE);
-        $this->base_url = rtrim($this->CI->config->item('atlas_api_base_url', 'atlas_api'), '/');
+        $raw_url = $this->CI->config->item('atlas_api_base_url', 'atlas_api') ?: 'http://api:8000';
+        $this->base_url = rtrim((string)$raw_url, '/');
         $this->timeout = $this->CI->config->item('atlas_api_timeout', 'atlas_api') ?: 25;
         $this->client_keys = $this->CI->config->item('atlas_client_keys', 'atlas_api') ?: array();
     }
 
     /**
-     * Resolves the server-side API key for a client.
+     * Resolves the server-side API key for a client from MySQL database or config.
      */
     public function get_client_key($client_id) {
+        // 1. Lookup from MySQL clients table directly
+        if (isset($this->CI->db)) {
+            $row = $this->CI->db->get_where('clients', array('id' => $client_id))->row_array();
+            if (!empty($row['api_key'])) {
+                return $row['api_key'];
+            }
+        }
+
+        // 2. Fallback to loaded config mapping
         if (isset($this->client_keys[$client_id]['api_key'])) {
             return $this->client_keys[$client_id]['api_key'];
         }
+
         return NULL;
     }
 

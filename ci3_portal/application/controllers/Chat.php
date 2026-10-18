@@ -13,6 +13,7 @@ class Chat extends CI_Controller {
         $this->load->library('session');
         $this->load->library('atlas_api');
         $this->load->model('conversation_model');
+        $this->load->model('client_model');
         $this->load->helper('security');
         $this->load->helper('url');
 
@@ -26,14 +27,26 @@ class Chat extends CI_Controller {
      * Main Portal Chat View.
      */
     public function index() {
-        $client_id = $this->session->userdata('atlas_client_id');
-        $this->load->config('atlas_api', TRUE);
-        $client_keys = $this->config->item('atlas_client_keys', 'atlas_api');
-        $client_info = isset($client_keys[$client_id]) ? $client_keys[$client_id] : array('company_name' => 'Unknown Enterprise');
+        $client_id = $this->session->userdata('atlas_client_id') ?: 'C-01';
+
+        // 1. Fetch real client company name from MySQL
+        $client_row = $this->client_model->get_client($client_id);
+        $company_name = !empty($client_row['company_name']) ? $client_row['company_name'] : 'Unknown Enterprise';
+
+        // 2. Fetch real entitlements and complete catalog access from MySQL
+        $entitlements_summary = $this->client_model->get_client_entitlements_summary($client_id);
+        $catalog_reports = $this->client_model->get_catalog_access($client_id);
+
+        $client_info = array(
+            'company_name' => $company_name,
+            'purchased_reports' => $entitlements_summary['purchased_reports'],
+            'accessible_excerpts' => $entitlements_summary['accessible_excerpts']
+        );
 
         $data = array(
             'client_id' => $client_id,
             'client_info' => $client_info,
+            'catalog_reports' => $catalog_reports,
             'conversation_id' => $this->conversation_model->get_active_conversation_id(),
             'messages' => $this->conversation_model->get_messages(),
             'csrf_name' => $this->security->get_csrf_token_name(),
