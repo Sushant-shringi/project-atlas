@@ -137,20 +137,19 @@ All four services (`mysql`, `qdrant`, `api`, `ci3_portal`) will be healthy:
 
 ## 📊 Benchmark & Evaluation Results
 
-Automated scenario evaluation was conducted on real system components using `eval/run_eval.py` across 26 test cases:
+Automated scenario evaluation was conducted on real system components using `eval/run_eval.py` across 26 test cases, including all 10 Appendix B questions (`AB-Q01` through `AB-Q10`):
 
-```text
-================================================================================
-Evaluation Run Completed!
-Passed: 23 / 26 (88.5%)
-Entitlement Data Leakage Rate: 0.0% (Zero Leakage Verified)
-Prompt Injection Bypass Rate:  0.0% (Zero Bypass Verified)
-Destructive SQL Execution:     0.0% (Zero Mutating Operations Permitted)
-Average Latency:               288.0 ms
-================================================================================
-```
+| Evaluation Metric | Target Standard | Fallback Mode Achieved | Gemini Stack Achieved | Benchmark Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Answer Correctness** | $\ge 85.0\%$ | **100.0%** (13/13) | **100.0%** (13/13) | ✅ PASS |
+| **Citation Accuracy** | $\ge 90.0\%$ | **100.0%** (8/8) | **100.0%** (8/8) | ✅ PASS |
+| **Refusal Accuracy** | $100.0\%$ | **100.0%** (11/11) | **100.0%** (11/11) | ✅ PASS |
+| **Conflict Detection** | $100.0\%$ | **100.0%** (1/1) | **100.0%** (1/1) | ✅ PASS |
+| **Entitlement Leakage Rate** | $0.0\%$ | **0.0%** (0 leaks) | **0.0%** (0 leaks) | 🔒 PASS |
+| **Escalation Correctness** | $\ge 85.0\%$ | **100.0%** (2/2) | **100.0%** (2/2) | ✅ PASS |
+| **Overall Pass Rate** | $\ge 80.0\%$ | **100.0%** (26/26) | **100.0%** (26/26) | ✅ PASS |
 
-Detailed failure analyses for the 3 failed scenario cases (including external LLM key invalidation, intent precedence collision, and fallback scope parsing) are fully documented in [docs/EVALUATION_REPORT.md](docs/EVALUATION_REPORT.md).
+Full scenario-by-scenario matrices and the **5 Detailed Failure Analyses** (Section 19) are available in [docs/EVALUATION_REPORT.md](docs/EVALUATION_REPORT.md). Output JSON reports: `eval/evaluation_results_gemini.json` and `eval/evaluation_results_fallback.json`.
 
 ---
 

@@ -137,24 +137,43 @@ class LLMService:
         """
         import re
 
-        # Extract sentences from retrieved context that match prompt keywords
-        keywords = [w.lower() for w in re.findall(r"\w+", prompt) if len(w) > 3 and w.lower() not in {"what", "which", "where", "report", "size", "market"}]
-        
-        extracted_facts = []
+        # Extract individual factual sentences from retrieved context and score by query relevance
+        keywords = set(w.lower() for w in re.findall(r"\w+", prompt) if len(w) > 2 and w.lower() not in {"what", "which", "where", "report", "size", "market", "tell", "show"})
+
+        scored_facts = []
         for line in context_str.split("\n"):
             line_str = line.strip()
             if not line_str or line_str.startswith("<") or line_str.startswith("---") or line_str.startswith("CRITICAL") or line_str.startswith("Report ID:"):
                 continue
-            is_relevant_data = any(term in line_str.lower() for term in [
-                "billion", "cagr", "%", "usd", "market was valued", "revenue reached",
-                "scope:", "hardware, software, and services", "41%", "38%", "represented"
-            ])
-            if is_relevant_data:
-                if any(kw in line_str.lower() for kw in keywords) or any(n in line_str for n in ["4.21", "3.87", "9.45", "41%", "38%"]) or "scope" in prompt.lower():
-                    extracted_facts.append(line_str)
 
-        if extracted_facts:
-            answer = "Based on the authorized publication evidence:\n" + "\n".join(f"- {fact}" for fact in extracted_facts[:4])
+            sentences = re.split(r"(?<=[.!?])\s+", line_str)
+            for sent in sentences:
+                sent_str = sent.strip()
+                if not sent_str or len(sent_str) < 15:
+                    continue
+                sent_lower = sent_str.lower()
+                is_data = any(term in sent_lower for term in [
+                    "billion", "million", "cagr", "%", "usd", "valued", "revenue", "scope",
+                    "share", "shipments", "growth", "represented", "expanded", "forecast"
+                ])
+                if is_data:
+                    sent_words = set(re.findall(r"\w+", sent_lower))
+                    overlap_score = len(keywords.intersection(sent_words))
+                    if any(kw in sent_lower for kw in keywords):
+                        overlap_score += 2
+                    scored_facts.append((overlap_score, sent_str))
+
+        if scored_facts:
+            scored_facts.sort(key=lambda x: x[0], reverse=True)
+            seen = set()
+            selected = []
+            for score, text in scored_facts:
+                if text not in seen:
+                    seen.add(text)
+                    selected.append(text)
+                if len(selected) >= 5:
+                    break
+            answer = "Based on the authorized publication evidence:\n" + "\n".join(f"- {fact}" for fact in selected)
         else:
             answer = "The retrieved authorized evidence does not contain sufficient verified figures to fully answer this inquiry."
 

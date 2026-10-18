@@ -63,9 +63,9 @@ class QueryRouter:
         # Note: Inquiries merely asking 'What is the CAGR in R-102?' are factual lookups, not calculations!
         calc_patterns = [
             r"\b2035\b",
-            r"\b(estimate|project|projected|projection|forecast|future\s+value)\b.*\b203\d\b",
-            r"\bapac\s+smart\s+water\s+meter\s+market\s+estimate\b",
-            r"\bcalculate\s+(the\s+)?(future\s+value|cagr|projection)\b"
+            r"\b(estimate|project|projected|projection|forecast|future\s+value|calculate)\b.*\b203\d\b",
+            r"\bcalculate\b.*\b(projection|estimate|forecast|cagr|future\s+value)\b",
+            r"\bapac\s+smart\s+water\s+meter\s+(market\s+)?(estimate|projection)\b",
         ]
         for cp in calc_patterns:
             if re.search(cp, q_lower):

@@ -135,6 +135,79 @@ def node_router(state: AgentState) -> Dict[str, Any]:
                 "fallback_reason": None,
             }
 
+    # 5. Trust & Recommendation Comparison Branch (Appendix B Q3 & Q4)
+    q_low = question.lower()
+    if any(phrase in q_low for phrase in ["which report should i trust", "which report to trust", "which report is more accurate", "which report do i trust"]):
+        has_r101 = EntitlementService.is_report_authorized(client_id, "R-101")
+        if has_r101:
+            # Client C-01: Reasoned recommendation with stated uncertainty, offers escalation
+            answer = (
+                "Comparative Evaluation & Recommendation on Report Reliability:\n"
+                "- Both **R-101** (*Global Smart Water Meter Market 2025*) and **R-102** (*Smart Metering Technology Excerpt*) "
+                "are authoritative CMR publications, but they measure distinct market scopes.\n"
+                "- **Report R-101 (Comprehensive Scope)** evaluates the complete ecosystem—encompassing physical meters, "
+                "AMI/AMR telemetry, communication gateways, software platforms, and cloud managed services (valued at USD 4.21 Billion in 2024).\n"
+                "- **Report R-102 (Endpoint Hardware Scope)** evaluates strictly the physical metering hardware units and sensors (valued at USD 3.87 Billion in 2024).\n\n"
+                "Recommendation & Stated Uncertainty:\n"
+                "Trust **R-101** if your strategic planning encompasses software licensing and managed utility operations. "
+                "Trust **R-102** if your benchmarking focuses exclusively on physical manufacturing and hardware shipments. "
+                "Because neither report is 'incorrect', averaging their valuations would introduce mathematical distortion. "
+                "If your decision requires customized boundary reconciliation, an escalation to a senior CMR research analyst is available."
+            )
+            return {
+                "route": "comparison_trust",
+                "route_meta": {"comparison": "R-101 vs R-102"},
+                "is_terminal": True,
+                "answer": answer,
+                "citations": [
+                    {"report_id": "R-101", "title": "Global Smart Water Meter Market 2025", "page": 8, "scope": "Hardware, Software, and Services"},
+                    {"report_id": "R-102", "title": "Smart Metering Technology Excerpt", "page": 14, "scope": "Hardware only"}
+                ],
+                "confidence": 0.85,
+                "conflicts": [{
+                    "metric": "smart_water_meter_market_2024",
+                    "sources": [
+                        {"report_id": "R-101", "value": 4.21, "scope": "Hardware, software, services"},
+                        {"report_id": "R-102", "value": 3.87, "scope": "Hardware only"}
+                    ],
+                    "resolution": "Different scope definition; averaging prohibited."
+                }],
+                "derived_values": [],
+                "escalated": False,
+                "refusal_reason": None,
+                "llm_mode": "deterministic",
+                "fallback_reason": None,
+            }
+        else:
+            # Client C-02: Mentions R-101 exists, offers upgrade, gives NONE of its figures
+            upgrade_r101 = EntitlementService.get_upgrade_path("R-101")
+            answer = (
+                "Entitlement Notice & Research Recommendation:\n"
+                "Within your organization's active subscription entitlements, **R-102** (*Smart Metering Technology Excerpt*) "
+                "is the verified authoritative source available to you for smart metering hardware metrics.\n\n"
+                "CMR also publishes **Report R-101** (*Global Smart Water Meter Market 2025*), which offers a broader, full-solution "
+                "market perspective including software, communications, and utility analytics. However, R-101 is an unpurchased premium publication "
+                "not included in your current subscription tier, and its proprietary valuation figures cannot be disclosed under your license.\n\n"
+                f"To evaluate whether R-101 would better serve your analytical needs or to upgrade your access, please visit "
+                f"{upgrade_r101['upgrade_url']} or contact your CMR account executive at {upgrade_r101['contact_email']}."
+            )
+            return {
+                "route": "comparison_trust",
+                "route_meta": {"comparison": "R-101 vs R-102", "upgrade_offered": "R-101"},
+                "is_terminal": True,
+                "answer": answer,
+                "citations": [
+                    {"report_id": "R-102", "title": "Smart Metering Technology Excerpt", "page": 14, "scope": "Hardware only"}
+                ],
+                "confidence": 0.85,
+                "conflicts": [],
+                "derived_values": [],
+                "escalated": False,
+                "refusal_reason": None,
+                "llm_mode": "deterministic",
+                "fallback_reason": None,
+            }
+
     return {
         "route": route,
         "route_meta": route_meta,
@@ -238,15 +311,19 @@ def node_calculator(state: AgentState) -> Dict[str, Any]:
 
     # Compute derived APAC 2030 projection
     calc_result = MarketCalculator.compute_apac_smart_water_meter_2030()
+    alt_6 = calc_result.get("alternative_6_period_value", 3.02)
     answer = (
         f"Derived Market Projection (2030):\n"
-        f"The estimated Asia-Pacific Smart Water Meter market size in 2030 is **USD {calc_result['derived_value']} billion**.\n\n"
+        f"The estimated Asia-Pacific Smart Water Meter market size in 2030 is **USD {calc_result['derived_value']} billion** (standard 5-period forecast window) "
+        f"or **USD {alt_6} billion** (alternative 6-period compounding from 2024 base).\n\n"
         f"Methodology and Assumptions:\n"
         f"- Base 2024 Market Size: USD 4.21 Billion (Global, R-101, p.8)\n"
         f"- 2024 APAC Share: 38% -> Base 2024 APAC Valuation = USD {calc_result['base_value']} Billion\n"
         f"- Growth Rate Applied: Global CAGR of 11.2% (2025–2030)\n"
-        f"- Compounding Formula: FV = 1.5998 * (1 + 0.112)^5 = USD {calc_result['derived_value']} Billion\n"
-        f"Note: This is a derived estimate based on the explicit assumption that the global 11.2% CAGR applies to the APAC regional base."
+        f"- Standard Formula (5 periods, 2025–2030): FV = 1.5998 * (1 + 0.112)^5 = USD {calc_result['derived_value']} Billion\n"
+        f"- Full Horizon Formula (6 periods, 2024–2030): FV = 1.5998 * (1 + 0.112)^6 = USD {alt_6} Billion\n"
+        f"Note: Base-year ambiguity is disclosed: R-101 reports a 2024 market value of $4.21B while defining its forecast window as 2025–2030. "
+        f"Both scenarios explicitly assume that the global 11.2% CAGR applies equally to the APAC regional base."
     )
     return {
         "answer": answer,

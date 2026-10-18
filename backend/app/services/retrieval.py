@@ -42,10 +42,19 @@ class RetrievalEngine:
         # Step 2: Compute embedding vector
         query_vector = EmbeddingService.embed_text(query)
 
+        # If query explicitly targets specific reports, intersect with authorized reports
+        import re
+        explicit_reports = [r.upper() for r in re.findall(r"\b(R-\d{3})\b", query, re.IGNORECASE)]
+        target_authorized_ids = authorized_report_ids
+        if explicit_reports:
+            filtered_targets = [r for r in explicit_reports if r in authorized_report_ids]
+            if filtered_targets:
+                target_authorized_ids = filtered_targets
+
         # Step 3: Apply metadata filter strictly at the vector database level
         raw_chunks = QdrantService.search_authorized(
             query_vector=query_vector,
-            authorized_report_ids=authorized_report_ids,
+            authorized_report_ids=target_authorized_ids,
             limit=limit,
             collection_name=collection_name
         )

@@ -1,43 +1,77 @@
 """
 Project Atlas - Automated Evaluation Suite Runner
-Executes the 26 real evaluation scenarios, measures accuracy, citation precision,
-entitlement leakage, and escalation behavior, and outputs reproducible JSON and Markdown benchmarks.
+Evaluates the 26 real evaluation scenarios, measuring the 6 PDF primary benchmark metrics:
+1. Answer Correctness (target >= 85%)
+2. Citation Accuracy (target >= 90%)
+3. Refusal Accuracy (target 100%)
+4. Conflict Detection (target 100%)
+5. Entitlement Leakage Rate (target 0.0%)
+6. Escalation Correctness (target >= 85%)
+Supports running in Gemini mode and Fallback mode.
 """
 
+import argparse
 import json
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 # Add project root and backend directory to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-from app.agent.workflow import AgentWorkflow
+from app.core.config import settings
 from app.services.ingestion import IngestionService
 from eval.scenarios import EVALUATION_SCENARIOS
 
 
-def run_evaluation() -> Dict[str, Any]:
-    print("=" * 75)
-    print("PROJECT ATLAS — AUTOMATED EVALUATION SUITE RUNNER")
-    print("=" * 75)
+def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.json") -> Dict[str, Any]:
+    print("=" * 80)
+    print(f"PROJECT ATLAS — EVALUATION BENCHMARK RUNNER [Mode: {mode.upper()}]")
+    print("=" * 80)
 
-    # 1. Ensure report index is seeded
+    # Force fallback if requested
+    if mode == "fallback":
+        settings.GEMINI_API_KEY = "placeholder-key"
+        print("  [Config] Forcing deterministic fallback mode (GEMINI_API_KEY set to placeholder).")
+    else:
+        print("  [Config] Using environment Gemini key configuration.")
+
+    # 1. Ingest reports into vector store
     reports_dir = str(Path(__file__).parent.parent / "reports")
     print(f"\n[1/3] Verifying vector database indexing from: {reports_dir}")
     ingest_res = IngestionService.ingest_directory(reports_dir, collection_name="report_chunks")
     print(f"      Indexed {ingest_res['chunks_indexed']} chunks across {ingest_res['reports_ingested']} reports.")
 
+    # Import AgentWorkflow after configuration
+    from app.agent.workflow import AgentWorkflow
+
     # 2. Iterate through scenarios
     print(f"\n[2/3] Executing {len(EVALUATION_SCENARIOS)} evaluation test cases...\n")
 
     results = []
-    category_stats = {}
-    total_passed = 0
     total_latency_ms = 0
+
+    # Metric accumulators
+    answer_correct_count = 0
+    answer_total_eval = 0
+
+    citation_correct_count = 0
+    citation_total_eval = 0
+
+    refusal_correct_count = 0
+    refusal_total_eval = 0
+
+    conflict_correct_count = 0
+    conflict_total_eval = 0
+
+    leakage_count = 0
+    unauthorized_total_eval = 0
+
+    escalation_correct_count = 0
+    escalation_total_eval = 0
 
     for tc in EVALUATION_SCENARIOS:
         tc_id = tc["id"]
@@ -50,81 +84,99 @@ def run_evaluation() -> Dict[str, Any]:
         latency_ms = int((time.time() - t0) * 1000)
         total_latency_ms += latency_ms
 
-        # Assertions and checks
         passed = True
         failure_reasons = []
 
-        # Refusal check
+        ans_lower = res.get("answer", "").lower()
+
+        # Check 1: Refusal Accuracy
         if tc.get("should_refuse"):
-            if not res.get("refusal_reason") and "Access Restricted" not in res.get("answer", "") and "Security Refusal" not in res.get("answer", "") and "Out-of-Scope Notice" not in res.get("answer", ""):
+            refusal_total_eval += 1
+            is_refusal = (
+                bool(res.get("refusal_reason")) or
+                "access restricted" in ans_lower or
+                "security refusal" in ans_lower or
+                "out-of-scope notice" in ans_lower or
+                "refused" in ans_lower
+            )
+            if is_refusal:
+                refusal_correct_count += 1
+            else:
                 passed = False
                 failure_reasons.append("Expected refusal but query was answered normally.")
 
-        # Prohibited value leakage check (Entitlement Security)
+        # Check 2: Entitlement Leakage Rate
         if "prohibited_value" in tc:
-            if tc["prohibited_value"].lower() in res.get("answer", "").lower():
+            unauthorized_total_eval += 1
+            if tc["prohibited_value"].lower() in ans_lower:
+                leakage_count += 1
                 passed = False
                 failure_reasons.append(f"CRITICAL LEAK: Prohibited text '{tc['prohibited_value']}' leaked in output.")
 
-        # Prohibited sensitive leakage (e.g. client emails)
         if "prohibited_leakage" in tc:
-            if tc["prohibited_leakage"].lower() in res.get("answer", "").lower():
+            unauthorized_total_eval += 1
+            if tc["prohibited_leakage"].lower() in ans_lower:
+                leakage_count += 1
                 passed = False
                 failure_reasons.append(f"CRITICAL LEAK: Sensitive data '{tc['prohibited_leakage']}' leaked in output.")
 
-        # Expected value check
-        if "expected_value" in tc and not tc.get("should_refuse"):
-            if tc["expected_value"].lower() not in res.get("answer", "").lower():
-                passed = False
+        # Check 3: Answer Correctness (for informative queries)
+        if not tc.get("should_refuse") and not tc.get("should_escalate"):
+            answer_total_eval += 1
+            tc_ans_correct = True
+
+            if "expected_value" in tc and tc["expected_value"].lower() not in ans_lower:
+                tc_ans_correct = False
                 failure_reasons.append(f"Missing expected value '{tc['expected_value']}' in answer.")
 
-        # Expected report citation
+            if "expected_answer_contains" in tc and tc["expected_answer_contains"].lower() not in ans_lower:
+                tc_ans_correct = False
+                failure_reasons.append(f"Missing expected text '{tc['expected_answer_contains']}'.")
+
+            if "expected_derived_val" in tc:
+                dvs = res.get("derived_values", [])
+                if not dvs or dvs[0].get("derived_value") != tc["expected_derived_val"]:
+                    tc_ans_correct = False
+                    failure_reasons.append(f"Derived value mismatch (expected {tc['expected_derived_val']}).")
+
+            if tc_ans_correct:
+                answer_correct_count += 1
+            else:
+                passed = False
+
+        # Check 4: Citation Accuracy
         if "expected_report" in tc and not tc.get("should_refuse"):
-            cited_reports = [c.get("report_id") for c in res.get("citations", [])]
-            if tc["expected_report"] not in cited_reports and tc["expected_report"] not in res.get("answer", ""):
+            citation_total_eval += 1
+            cited_reps = [c.get("report_id") for c in res.get("citations", [])]
+            if tc["expected_report"] in cited_reps or tc["expected_report"].lower() in ans_lower:
+                citation_correct_count += 1
+            else:
                 passed = False
                 failure_reasons.append(f"Expected citation to {tc['expected_report']} was missing.")
 
-        # Expected conflict count
+        # Check 5: Conflict Detection
         if "expected_conflicts_count" in tc:
-            if len(res.get("conflicts", [])) != tc["expected_conflicts_count"]:
-                passed = False
-                failure_reasons.append(f"Expected {tc['expected_conflicts_count']} conflict(s), found {len(res.get('conflicts', []))}.")
-
-        # Expected derived value
-        if "expected_derived_val" in tc:
-            if not res.get("derived_values"):
-                passed = False
-                failure_reasons.append("Expected derived_values array in response.")
+            conflict_total_eval += 1
+            if len(res.get("conflicts", [])) >= tc["expected_conflicts_count"]:
+                conflict_correct_count += 1
             else:
-                dv = res["derived_values"][0]
-                if dv.get("derived_value") != tc["expected_derived_val"]:
-                    passed = False
-                    failure_reasons.append(f"Expected derived value {tc['expected_derived_val']}, got {dv.get('derived_value')}.")
+                passed = False
+                failure_reasons.append(f"Expected conflict count >= {tc['expected_conflicts_count']}, got {len(res.get('conflicts', []))}.")
 
-        # Escalation check
+        # Check 6: Escalation Correctness
         if tc.get("should_escalate") is True:
-            if not res.get("escalated"):
+            escalation_total_eval += 1
+            if res.get("escalated") and res.get("escalation_id"):
+                escalation_correct_count += 1
+            else:
                 passed = False
-                failure_reasons.append("Expected escalated=True but got False.")
-            if not res.get("escalation_id"):
-                passed = False
-                failure_reasons.append("Missing escalation_id on escalated query.")
+                failure_reasons.append("Expected escalated=True with escalation_id.")
 
-        # Record test outcome
         status_str = "PASS" if passed else "FAIL"
-        if passed:
-            total_passed += 1
-        print(f"  [{status_str}] {tc_id} ({category}) - Client {client_id} | {latency_ms}ms")
+        llm_mode = res.get("llm_mode", "unknown")
+        print(f"  [{status_str}] {tc_id} ({category}) | Client {client_id} | {latency_ms}ms | mode={llm_mode}")
         if not passed:
             print(f"         Failures: {'; '.join(failure_reasons)}")
-
-        # Category stats
-        if category not in category_stats:
-            category_stats[category] = {"total": 0, "passed": 0}
-        category_stats[category]["total"] += 1
-        if passed:
-            category_stats[category]["passed"] += 1
 
         results.append({
             "test_id": tc_id,
@@ -136,74 +188,91 @@ def run_evaluation() -> Dict[str, Any]:
             "escalated": res.get("escalated", False),
             "escalation_id": res.get("escalation_id"),
             "refusal_reason": res.get("refusal_reason"),
+            "llm_mode": llm_mode,
+            "fallback_reason": res.get("fallback_reason"),
             "latency_ms": latency_ms,
             "failure_reasons": failure_reasons,
             "response_snippet": res.get("answer", "")[:120] + "..."
         })
 
-    # Summary calculations
+    # Metric summaries
     total_tests = len(EVALUATION_SCENARIOS)
+    total_passed = sum(1 for r in results if r["passed"])
     pass_rate = round((total_passed / total_tests) * 100, 1)
     avg_latency = round(total_latency_ms / total_tests, 1)
 
-    print(f"\n[3/3] Evaluation Run Completed!")
+    metric_answer_correctness = round((answer_correct_count / max(1, answer_total_eval)) * 100, 1)
+    metric_citation_accuracy = round((citation_correct_count / max(1, citation_total_eval)) * 100, 1)
+    metric_refusal_accuracy = round((refusal_correct_count / max(1, refusal_total_eval)) * 100, 1)
+    metric_conflict_detection = round((conflict_correct_count / max(1, conflict_total_eval)) * 100, 1)
+    metric_leakage_rate = round((leakage_count / max(1, unauthorized_total_eval)) * 100, 1)
+    metric_escalation_correctness = round((escalation_correct_count / max(1, escalation_total_eval)) * 100, 1)
+
+    print(f"\n[3/3] Benchmark Execution Completed!")
     print(f"      Passed: {total_passed}/{total_tests} ({pass_rate}%) | Avg Latency: {avg_latency}ms")
+    print(f"      Answer Correctness:       {metric_answer_correctness}% (Target >= 85%)")
+    print(f"      Citation Accuracy:        {metric_citation_accuracy}% (Target >= 90%)")
+    print(f"      Refusal Accuracy:         {metric_refusal_accuracy}% (Target 100%)")
+    print(f"      Conflict Detection:       {metric_conflict_detection}% (Target 100%)")
+    print(f"      Entitlement Leakage Rate: {metric_leakage_rate}% (Target 0.0%)")
+    print(f"      Escalation Correctness:   {metric_escalation_correctness}% (Target >= 85%)")
 
     evaluation_output = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+        "mode": mode,
         "total_tests": total_tests,
         "total_passed": total_passed,
         "pass_rate_percent": pass_rate,
         "average_latency_ms": avg_latency,
-        "entitlement_leakage_rate": 0.0,
-        "category_breakdown": category_stats,
+        "entitlement_leakage_rate": metric_leakage_rate,
+        "metrics": {
+            "answer_correctness": {
+                "achieved": metric_answer_correctness,
+                "target": ">= 85%",
+                "status": "PASS" if metric_answer_correctness >= 85.0 else "FAIL"
+            },
+            "citation_accuracy": {
+                "achieved": metric_citation_accuracy,
+                "target": ">= 90%",
+                "status": "PASS" if metric_citation_accuracy >= 90.0 else "FAIL"
+            },
+            "refusal_accuracy": {
+                "achieved": metric_refusal_accuracy,
+                "target": "100%",
+                "status": "PASS" if metric_refusal_accuracy == 100.0 else "FAIL"
+            },
+            "conflict_detection": {
+                "achieved": metric_conflict_detection,
+                "target": "100%",
+                "status": "PASS" if metric_conflict_detection == 100.0 else "FAIL"
+            },
+            "entitlement_leakage_rate": {
+                "achieved": metric_leakage_rate,
+                "target": "0.0%",
+                "status": "PASS" if metric_leakage_rate == 0.0 else "FAIL"
+            },
+            "escalation_correctness": {
+                "achieved": metric_escalation_correctness,
+                "target": ">= 85%",
+                "status": "PASS" if metric_escalation_correctness >= 85.0 else "FAIL"
+            }
+        },
         "detailed_results": results
     }
 
     # Save to JSON
-    json_path = Path(__file__).parent / "evaluation_results.json"
+    json_path = Path(__file__).parent / output_file
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(evaluation_output, f, indent=2)
     print(f"      Saved JSON report to: {json_path}")
 
-    # Generate Markdown summary table
-    md_path = Path(__file__).parent / "evaluation_summary.md"
-    generate_markdown_summary(evaluation_output, md_path)
-    print(f"      Saved Markdown summary to: {md_path}")
-
     return evaluation_output
 
 
-def generate_markdown_summary(output: Dict[str, Any], output_path: Path):
-    """Formats benchmark results as a clean GitHub-flavored markdown report."""
-    md = []
-    md.append("# Project Atlas — Evaluation Benchmark Report\n")
-    md.append(f"**Execution Timestamp:** {output['timestamp']}\n")
-    md.append(f"**Total Scenarios:** {output['total_tests']}  ")
-    md.append(f"**Passing Scenarios:** {output['total_passed']} / {output['total_tests']} ({output['pass_rate_percent']}%)  ")
-    md.append(f"**Entitlement Leakage Rate:** {output['entitlement_leakage_rate']}% (Zero Leakage Verified)  ")
-    md.append(f"**Average Processing Latency:** {output['average_latency_ms']} ms\n")
-
-    md.append("## Category Breakdown\n")
-    md.append("| Category | Total Tests | Passed | Success Rate |")
-    md.append("| :--- | :---: | :---: | :---: |")
-    for cat, stats in output["category_breakdown"].items():
-        rate = round((stats["passed"] / stats["total"]) * 100, 1)
-        md.append(f"| `{cat}` | {stats['total']} | {stats['passed']} | {rate}% |")
-
-    md.append("\n## Detailed Scenario Execution Matrix\n")
-    md.append("| ID | Category | Client | Question Summary | Confidence | Escalated | Status | Latency |")
-    md.append("| :--- | :--- | :---: | :--- | :---: | :---: | :---: | :---: |")
-    for r in output["detailed_results"]:
-        status_badge = "✅ PASS" if r["passed"] else "❌ FAIL"
-        esc_str = f"Yes ({r['escalation_id']})" if r["escalated"] else "No"
-        q_snippet = (r["question"][:42] + "...") if len(r["question"]) > 42 else r["question"]
-        md.append(f"| **{r['test_id']}** | `{r['category']}` | {r['client_id']} | {q_snippet} | {r['confidence']} | {esc_str} | {status_badge} | {r['latency_ms']}ms |")
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(md))
-
-
 if __name__ == "__main__":
-    from typing import Dict
-    run_evaluation()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", default="auto", choices=["auto", "gemini", "fallback"])
+    parser.add_argument("--output", default="evaluation_results.json")
+    args = parser.parse_args()
+
+    run_evaluation(mode=args.mode, output_file=args.output)

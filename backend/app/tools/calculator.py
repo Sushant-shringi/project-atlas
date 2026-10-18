@@ -51,29 +51,40 @@ class MarketCalculator:
         cagr = 11.20
         periods = 5  # Explicit five-period calculation for 2025-2030 forecast window
 
-        fv = cls.calculate_future_value(
+        fv_5 = cls.calculate_future_value(
             present_value=base_apac_2024,
             cagr_percent=cagr,
             base_year=2024,
             target_year=2030,
-            periods=periods
+            periods=5
         )
-        rounded_fv = round(fv, 2)  # 2.72
+        rounded_fv_5 = round(fv_5, 2)  # 2.72
+
+        fv_6 = cls.calculate_future_value(
+            present_value=base_apac_2024,
+            cagr_percent=cagr,
+            base_year=2024,
+            target_year=2030,
+            periods=6
+        )
+        rounded_fv_6 = round(fv_6, 2)  # 3.02
 
         return {
             "metric": "Asia-Pacific Smart Water Meter Market Size (2030 Projection)",
-            "derived_value": rounded_fv,
+            "derived_value": rounded_fv_5,
+            "alternative_6_period_value": rounded_fv_6,
             "unit": "USD Billion",
             "base_value": base_apac_2024,
             "base_year": 2024,
             "target_year": 2030,
             "cagr_applied": cagr,
-            "formula": "FV = PV_apac * (1 + CAGR_global)^5",
+            "formula": "FV = PV_apac * (1 + CAGR_global)^n (n=5 for 2025-2030 window; n=6 from 2024 base)",
             "is_derived_estimate": True,
+            "base_year_ambiguity": "Report R-101 states 2024 market value of $4.21B with 2025-2030 forecast CAGR of 11.2%. Compounding over 5 periods yields $2.72B; compounding over 6 full annual periods from 2024 yields $3.02B.",
             "assumptions": [
                 "Applied global 2025–2030 CAGR of 11.2% to APAC base because report R-101 does not disclose an APAC-specific growth rate.",
                 "Base 2024 APAC market valuation derived as 38% of global USD 4.21B market = USD 1.60B.",
-                "Assumed compounding over 5 annual periods from end-of-year 2024/2025 baseline to 2030."
+                "Assumed standard compounding over 5 annual periods for the 2025–2030 forecast window ($2.72B); alternative 6-period compounding yields $3.02B."
             ],
             "citations": [
                 {
