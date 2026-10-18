@@ -13,8 +13,8 @@ This document tracks progress on the final strict fix-and-verify pass in priorit
 | **Phase 2** | **Entitlement & Answer Correctness (B2, B6, B7, B8)** | **DONE** | No hardcoded template answers; dynamic metadata (titles/publishers from MySQL); stated scope uncertainty; zero R-101 figure/citation leaks for C-02; strict citation grounding (no R-103 purifier on smart water meter queries); confidence policy calibrated to 0.80 on source conflict and single-source boundary; live Qdrant container connected. Evidence: `artifacts/e2e/phase2/` (6 JSON files). |
 | **Phase 3** | **Derived Value, Security Refusal, SQL Query Display, Redirect (B1, B3, B4, B5)** | **DONE** | APAC 2030 projection shows both 5/6 period values (2.72B/3.02B), inputs, CAGR, formula, and base-year ambiguity; C-02 properly refused with zero leak; prompt injection refused with security violation and logged to MySQL `audit_events` (Row ID 6); parameterized SQL query displayed in markdown; out-of-scope election queries redirected with concrete research suggestions. Evidence: `artifacts/e2e/phase3/` (5 JSON files + 5 screenshots). |
 | **Phase 4** | **SQL Timeout & DB Write Denial (D1), Gemini & Fallback Eval (C1, C5)** | **DONE** | Least-privilege DB write denial (MySQL 1142 on INSERT/UPDATE/DELETE/DROP and sensitive SELECT), 2s SQL read timeout, 26/26 (100%) eval pass on live Gemini (932ms avg) and 26/26 on Fallback (846ms avg). Evidence: `artifacts/e2e/phase4/` (4 files). |
-| **Phase 5** | **Documentation Updates (C2, C3, C4, D2, D3)** | IN PROGRESS | Failure analyses (real observed), limitations, cost/token notes, reviewer docs. |
-| **Phase 6** | **Final Verification & Full Regression Matrix** | PENDING | Complete regression matrix with Playwright evidence, single pytest background run, secrets hygiene check, git push. |
+| **Phase 5** | **Documentation Updates (C2, C3, C4, D2, D3)** | **DONE** | Updated EVALUATION_REPORT.md (side-by-side Gemini vs Fallback table, 5 real observed failure analyses, token costs & latency profiles), updated README.md with IPv6 troubleshooting & live vs fallback modes. |
+| **Phase 6** | **Final Verification & Full Regression Matrix** | IN PROGRESS | Complete regression matrix with Playwright evidence, single pytest background run, secrets hygiene check, git push. |
 
 ---
 
@@ -123,6 +123,19 @@ This document tracks progress on the final strict fix-and-verify pass in priorit
   - Evidence: `artifacts/e2e/phase4/eval_results_fallback.json`.
 - **Cost & Token Tracking (Live MySQL `llm_usage_records`):**
   - Tracked across 33 live Gemini calls: 51,110 tokens, total estimated cost of $0.005295.
+
+---
+
+## Phase 5 Verification Summary (Comprehensive Documentation & Failure Analyses)
+- **C2 (5 Real Observed Failure Analyses):** Documented in `docs/EVALUATION_REPORT.md` Section 5 with exact prompts, system errors, root causes, engineering fixes, and added regression tests:
+  1. CI3 Portal relative redirect loop & host cross-port navigation (`header('Location: /chat'); exit;`).
+  2. Cross-topic vector semantic bleed & citation hallucination (`FactCheckerCritic.filter_citations_to_answer()`).
+  3. LLM associative hallucination of unprovided report IDs (`SYSTEM_INSTRUCTION` negative constraints & critic whitelist).
+  4. Obscure query topic overlap false confidence (`FactCheckerCritic` generic domain word stop-list).
+  5. MySQL PyMySQL snapshot isolation masking newly committed audit rows in tests (`autocommit=True` resolution).
+- **D2 & C1 (Dual Benchmark Comparison Table):** Embedded side-by-side comparison in `docs/EVALUATION_REPORT.md` Section 2 comparing Live Gemini (932.3ms, $0.0053 cost) vs Deterministic Fallback (846.5ms, $0.00 cost) with 100% pass rates across all 6 PDF benchmark criteria.
+- **C3 & C4 (Pricing, Latency & Limitations):** Documented subsystem latency breakdowns, MySQL `llm_usage_records` accounting, 15 RPM free-tier rate limit mitigation, and Windows IPv6 `127.0.0.1` binding.
+
 
 
 
