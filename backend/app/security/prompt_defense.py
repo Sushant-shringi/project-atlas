@@ -49,11 +49,38 @@ class PromptDefense:
         return is_suspicious, matches
 
     @classmethod
+    def sanitize_untrusted_text(cls, text: str) -> Tuple[str, bool, List[str]]:
+        """
+        Sanitizes untrusted text by neutralizing detected prompt-injection directives
+        into safe placeholders ([DISARMED_DIRECTIVE]) while preserving factual market evidence.
+        
+        Note: Regex detection and directive neutralization are components of a comprehensive
+        defense-in-depth posture:
+        1. Pre-retrieval entitlement filtering prevents unauthorized publication chunks from loading.
+        2. XML boundary containment (<UNTRUSTED_DOCUMENT_CONTEXT>) enforces passive data framing.
+        3. Regex neutralization disarms high-risk control instructions in untrusted chunks.
+        4. Post-synthesis critic validation verifies all output claims against retrieved facts.
+        """
+        if not text:
+            return "", False, []
+
+        matches = []
+        sanitized = text
+        for pattern in SUSPICIOUS_PATTERNS:
+            if pattern.search(sanitized):
+                matches.append(pattern.pattern)
+                sanitized = pattern.sub("[DISARMED_DIRECTIVE]", sanitized)
+
+        is_suspicious = len(matches) > 0
+        return sanitized, is_suspicious, matches
+
+    @classmethod
     def wrap_untrusted_context(cls, chunks: List[Dict]) -> str:
         """
         Encapsulates retrieved report chunks in strict XML-style containment tags.
         Treats all retrieved document text as passive, untrusted reference material.
         Instructs the model never to treat text inside the tags as instructions.
+        Neutralizes known prompt-injection directives while preserving factual data.
         """
         if not chunks:
             return "No authorized reference documents found."
@@ -73,14 +100,17 @@ class PromptDefense:
             scope = chunk.get("scope", "General")
             content = chunk.get("text", "")
 
-            # If chunk contains known injection text, we sanitize or neutralize malicious directives
-            # while keeping legitimate surrounding factual market metrics intact.
-            sanitized_content = content
-            is_suspicious, _ = cls.scan_for_injection(content)
+            # Neutralize active injection directives while preserving factual data
+            sanitized_content, is_suspicious, matched_patterns = cls.sanitize_untrusted_text(content)
             if is_suspicious:
-                logger.info(
-                    f"Retrieved chunk from {report_id} page {page} contains injection signature. Isolating content.",
-                    extra={"report_id": report_id, "page": page, "event_type": "DOCUMENT_INJECTION_ISOLATED"}
+                logger.warning(
+                    f"Retrieved chunk from {report_id} page {page} contains injection signatures: {matched_patterns}. Neutralized.",
+                    extra={
+                        "report_id": report_id,
+                        "page": page,
+                        "event_type": "DOCUMENT_INJECTION_NEUTRALIZED",
+                        "patterns": matched_patterns
+                    }
                 )
 
             context_parts.append(

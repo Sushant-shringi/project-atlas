@@ -6,12 +6,13 @@ Treats retrieved context as untrusted, tracks token usage and latency, and recor
 
 import time
 from typing import Any, Dict, List, Optional, Tuple
-import google.generativeai as genai
+from google import genai
+from google.genai import types, errors
 from app.core.config import settings
 from app.core.logging_config import logger
 from app.db.connection import DatabaseManager
 
-# Pricing constants for Gemini 1.5 Flash (USD per 1M tokens)
+# Pricing constants for Gemini 2.5 / 1.5 Flash (USD per 1M tokens)
 GEMINI_FLASH_INPUT_PER_1M = 0.075
 GEMINI_FLASH_OUTPUT_PER_1M = 0.30
 
@@ -67,31 +68,35 @@ class LLMService:
 
         for attempt in range(max_retries):
             try:
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel(
-                    model_name=settings.GEMINI_MODEL,
-                    system_instruction=SYSTEM_INSTRUCTION
-                )
-
+                client = genai.Client(api_key=api_key)
                 full_prompt = f"{bounded_context}\n\nClient Question: {prompt}\n\nPlease provide a clear, factual, and strictly cited response:"
 
-                response = model.generate_content(
-                    full_prompt,
-                    generation_config=genai.GenerationConfig(
+                response = client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=full_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
                         temperature=0.1,  # Low temperature for factual precision
-                        max_output_tokens=1024
-                    ),
-                    request_options={"timeout": 30}
+                        max_output_tokens=1024,
+                        http_options=types.HttpOptions(timeout=30000)
+                    )
                 )
                 break
             except Exception as e:
                 last_error = e
                 err_msg = str(e)
                 # Check for retryable rate-limit or transient server errors
-                is_retryable = any(code in err_msg for code in ["429", "ResourceExhausted", "500", "503", "ServiceUnavailable"])
+                is_retryable = False
+                if isinstance(e, errors.APIError):
+                    code = getattr(e, "code", None)
+                    if code in (429, 500, 503):
+                        is_retryable = True
+                if not is_retryable:
+                    is_retryable = any(code in err_msg for code in ["429", "ResourceExhausted", "500", "503", "ServiceUnavailable"])
+
                 if is_retryable and attempt < max_retries - 1:
                     backoff_delay = 2 ** attempt  # 1s, 2s, 4s
-                    logger.warning(f"Gemini API transient failure ({e}); retrying in {backoff_delay}s [Attempt {attempt+1}/{max_retries}]")
+                    logger.warning(f"Gemini API transient failure ({type(e).__name__}: {e}); retrying in {backoff_delay}s [Attempt {attempt+1}/{max_retries}]")
                     time.sleep(backoff_delay)
                 else:
                     break
@@ -104,8 +109,8 @@ class LLMService:
             prompt_tokens = 0
             completion_tokens = 0
             if hasattr(response, "usage_metadata") and response.usage_metadata:
-                prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
-                completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+                prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+                completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
 
             total_tokens = prompt_tokens + completion_tokens
             cost_usd = (prompt_tokens / 1_000_000.0 * GEMINI_FLASH_INPUT_PER_1M) + (completion_tokens / 1_000_000.0 * GEMINI_FLASH_OUTPUT_PER_1M)
@@ -123,8 +128,11 @@ class LLMService:
                 "llm_mode": "gemini",
                 "fallback_reason": None
             }
-            logger.info(f"Gemini LLM synthesis succeeded: latency={latency_ms}ms, tokens={total_tokens}, cost=${cost_usd:.6f}")
-            logger.info(f"Gemini LLM raw text: {answer_text}")
+            logger.info(
+                f"Gemini LLM synthesis succeeded: latency={latency_ms}ms, "
+                f"model={settings.GEMINI_MODEL}, prompt_tokens={prompt_tokens}, "
+                f"completion_tokens={completion_tokens}, total_tokens={total_tokens}, cost=${cost_usd:.6f}"
+            )
             return answer_text, metrics, "gemini", None
 
         # Gemini failed or was rejected: trigger documented graceful fallback

@@ -53,7 +53,7 @@ services:
       - ENVIRONMENT=development
       - PORT=8000
       - GEMINI_API_KEY=${GEMINI_API_KEY:-${GENAI_API_KEY:-placeholder-key}}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       - QDRANT_COLLECTION=report_chunks
