@@ -10,7 +10,10 @@ Proves:
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import app.services.qdrant_service as qdrant_service
+from app.services.qdrant_service import QdrantService
 # Add backend directory to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
@@ -174,3 +177,168 @@ def test_upgrade_contact_details_and_zero_leakage_c02():
             os.environ["UPGRADE_PORTAL_URL"] = orig_url
         else:
             os.environ.pop("UPGRADE_PORTAL_URL", None)
+
+def test_qdrant_filter_enforces_public_excerpt_boundary(monkeypatch):
+    """Verify excerpt restrictions are applied inside the Qdrant query filter."""
+
+    class FakeQdrantClient:
+        def __init__(self):
+            self.query_arguments = None
+
+        def query_points(self, **kwargs):
+            self.query_arguments = kwargs
+            return SimpleNamespace(points=[])
+
+    fake_client = FakeQdrantClient()
+
+    monkeypatch.setattr(
+        qdrant_service,
+        "get_qdrant_client",
+        lambda: fake_client,
+    )
+
+    monkeypatch.setattr(
+        QdrantService,
+        "ensure_collection",
+        classmethod(lambda cls, collection_name=None: None),
+    )
+
+    QdrantService.search_authorized(
+        query_vector=[0.0] * 384,
+        authorized_report_ids=["R-101", "R-102"],
+        limit=5,
+        collection_name="test_collection",
+    )
+
+    assert fake_client.query_arguments is not None
+
+    query_filter = fake_client.query_arguments["query_filter"]
+
+    # Only authorized report IDs may match.
+    assert query_filter.must[0].key == "report_id"
+    assert query_filter.must[0].match.any == ["R-101", "R-102"]
+
+    # The filter must allow non-excerpt reports.
+    allows_non_excerpt_reports = any(
+        condition.must_not
+        and any(
+            field.key == "access_type"
+            and field.match.value == "public_excerpt"
+            for field in condition.must_not
+        )
+        for condition in query_filter.should
+    )
+
+    # Public-excerpt reports must match excerpt chunks only.
+    requires_excerpt_flag = any(
+        condition.must
+        and any(
+            field.key == "is_excerpt"
+            and field.match.value is True
+            for field in condition.must
+        )
+        for condition in query_filter.should
+    )
+
+    assert allows_non_excerpt_reports, (
+        "Qdrant filter must allow authorized non-excerpt reports."
+    )
+    assert requires_excerpt_flag, (
+        "Qdrant filter must require is_excerpt=True for public excerpts."
+    )
+def test_qdrant_runtime_excludes_non_excerpt_chunks(monkeypatch):
+    """Verify Qdrant itself excludes non-excerpt public-report chunks."""
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import PointStruct, Distance, VectorParams
+    from types import SimpleNamespace
+    import app.services.qdrant_service as qdrant_service
+    from app.services.qdrant_service import QdrantService
+
+    dimension = 384
+    collection = "runtime_excerpt_boundary_test"
+
+    # A completely isolated, in-memory Qdrant instance.
+    client = QdrantClient(":memory:")
+    client.create_collection(
+        collection_name=collection,
+        vectors_config=VectorParams(
+            size=dimension,
+            distance=Distance.COSINE,
+        ),
+    )
+
+    vector = [1.0] + [0.0] * (dimension - 1)
+
+    client.upsert(
+        collection_name=collection,
+        points=[
+            PointStruct(
+                id=1,
+                vector=vector,
+                payload={
+                    "report_id": "R-TEST",
+                    "chunk_id": "excerpt",
+                    "access_type": "public_excerpt",
+                    "is_excerpt": True,
+                    "text": "Allowed public excerpt",
+                },
+            ),
+            PointStruct(
+                id=2,
+                vector=vector,
+                payload={
+                    "report_id": "R-TEST",
+                    "chunk_id": "outside_excerpt",
+                    "access_type": "public_excerpt",
+                    "is_excerpt": False,
+                    "text": "Content outside public excerpt",
+                },
+            ),
+        ],
+        wait=True,
+    )
+
+    class RecordingClient:
+        """Capture Qdrant's raw results before application-level checks."""
+
+        def __init__(self, wrapped):
+            self.wrapped = wrapped
+            self.raw_points = None
+
+        def __getattr__(self, name):
+            return getattr(self.wrapped, name)
+
+        def query_points(self, **kwargs):
+            response = self.wrapped.query_points(**kwargs)
+            self.raw_points = response.points
+            return response
+
+    recording_client = RecordingClient(client)
+
+    monkeypatch.setattr(
+        qdrant_service,
+        "get_qdrant_client",
+        lambda: recording_client,
+    )
+
+    results = QdrantService.search_authorized(
+        query_vector=vector,
+        authorized_report_ids=["R-TEST"],
+        limit=10,
+        collection_name=collection,
+    )
+
+    # Inspect Qdrant's raw output, before Python post-filtering.
+    assert recording_client.raw_points is not None
+    raw_chunk_ids = {
+        point.payload["chunk_id"]
+        for point in recording_client.raw_points
+    }
+    assert raw_chunk_ids == {"excerpt"}, (
+        f"Qdrant returned unexpected raw chunks: {raw_chunk_ids}"
+    )
+
+    # Also verify the final application-level response.
+    assert [chunk["chunk_id"] for chunk in results] == ["excerpt"]
+
+    client.close()

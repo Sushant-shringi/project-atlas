@@ -117,25 +117,54 @@ class QdrantService:
         Retrieves document chunks matching query vector, strictly bounded by authorized report IDs.
         Under NO circumstances does this query return chunks from unpurchased/unauthorized reports.
         """
-        from qdrant_client.models import Filter, FieldCondition, MatchAny
+        from qdrant_client.models import (
+            Filter,
+            FieldCondition,
+            MatchAny,
+            MatchValue,
+        )
 
         if not authorized_report_ids:
-            logger.warning("Search called with empty authorized_report_ids. Returning zero chunks.")
+            logger.warning(
+                "Search called with empty authorized_report_ids. Returning zero chunks."
+            )
             return []
 
         cls.ensure_collection(collection_name)
         client = get_qdrant_client()
         col_name = collection_name or settings.QDRANT_COLLECTION
 
-        # Build Qdrant metadata filter
+        # Enforce report authorization and public-excerpt boundaries
+        # directly in Qdrant, before chunks are returned.
         retrieval_filter = Filter(
             must=[
                 FieldCondition(
                     key="report_id",
-                    match=MatchAny(any=authorized_report_ids)
+                    match=MatchAny(any=authorized_report_ids),
                 )
-            ]
+            ],
+            should=[
+                # Non-excerpt reports can return their authorized chunks.
+                Filter(
+                    must_not=[
+                        FieldCondition(
+                            key="access_type",
+                            match=MatchValue(value="public_excerpt"),
+                        )
+                    ]
+                ),
+                # Public-excerpt reports can return excerpt chunks only.
+                Filter(
+                    must=[
+                        FieldCondition(
+                            key="is_excerpt",
+                            match=MatchValue(value=True),
+                        )
+                    ]
+                ),
+            ],
         )
+
 
         if hasattr(client, "query_points"):
             response = client.query_points(

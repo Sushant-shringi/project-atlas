@@ -83,3 +83,32 @@ def test_embeddings_generation():
     vec = EmbeddingService.embed_text(text)
     assert isinstance(vec, list)
     assert len(vec) == 384
+
+def test_public_excerpt_boundary_excludes_page_15_and_beyond(tmp_path):
+    """Only pages up to 14 should be marked as public excerpts."""
+
+    report_file = tmp_path / "R-TEST_Public_Excerpt.txt"
+    report_file.write_text(
+        """=== REPORT METADATA ===
+report_id: R-TEST
+title: Public Excerpt Boundary Test
+publisher: Test Publisher
+published_date: 2026-01-01
+sector: Utilities
+access_type: public_excerpt
+scope: Test scope
+
+--- PAGE 14 ---
+This content is within the public excerpt boundary.
+
+--- PAGE 15 ---
+This content is outside the public excerpt boundary.
+""",
+        encoding="utf-8",
+    )
+
+    parsed = IngestionService.parse_report_file(str(report_file))
+    pages = {chunk["page"]: chunk for chunk in parsed["chunks"]}
+
+    assert pages[14]["is_excerpt"] is True
+    assert pages[15]["is_excerpt"] is False
