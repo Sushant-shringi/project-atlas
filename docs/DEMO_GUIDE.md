@@ -41,7 +41,7 @@ flowchart LR
 ---
 
 ### Scene 2: Grounded Factual Query & Citation Verification (0:45 – 1:30)
-- **Visual:** Browser at `http://localhost:8080`. Client C-01 (Northwind Utilities) selected in tenant dropdown.
+- **Visual:** Browser at `http://localhost:8080`. Client C-01 (Northwind Utilities) active in portal (or click the **Northwind Utilities (C-01)** button in the header bar).
 - **Action:** Submit query:
   ```text
   What was the global smart water meter market size in 2024?
@@ -67,7 +67,7 @@ flowchart LR
 ---
 
 ### Scene 4: Entitlement Security & Zero Data Leakage Guarantee (2:15 – 3:00)
-- **Visual:** Switch the tenant dropdown to **Client C-02 (Blue Delta Infra)**.
+- **Visual:** Click the **Blue Delta Infra (C-02)** button in the header bar to switch client context.
 - **Action:** Submit query:
   ```text
   What are the key market figures and growth rate in report R-101?
@@ -96,11 +96,15 @@ flowchart LR
 - **Visual:** Portal chat window, followed by a MySQL database query in terminal.
 - **Action:** Submit query:
   ```text
-  What is the projected smart water meter market size in 2035?
+  What will the market be worth in 2035?
   ```
 - **Terminal Command:**
-  ```sql
-  docker compose exec mysql mysql -u atlas_app -patlas_secret -e "SELECT id, client_id, reason, status FROM project_atlas.escalation_tickets ORDER BY created_at DESC LIMIT 1;"
+  ```bash
+  # Bash / Linux / macOS:
+  docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" project_atlas -e "SELECT id, client_id, reason, status FROM escalation_tickets ORDER BY created_at DESC LIMIT 1;"'
+
+  # Windows PowerShell:
+  docker compose exec mysql sh -c "mysql -uroot -p\`$MYSQL_ROOT_PASSWORD project_atlas -e 'SELECT id, client_id, reason, status FROM escalation_tickets ORDER BY created_at DESC LIMIT 1;'"
   ```
 - **Script:**
   > *"When a client asks for a projection to 2035, the system recognizes that published forecasts terminate in 2030. Rather than hallucinating an ungrounded number, the critic flags an unsupported extrapolation and automatically registers an escalation ticket in MySQL.*
@@ -115,4 +119,4 @@ flowchart LR
 - **Script:**
   > *"Finally, looking at the CodeIgniter 3 integration: It features full CSRF protection with automatic token renewal, server-side secret API keys, and persistent user feedback stored directly in MySQL.*
   > 
-  > *Our automated Pytest suite covers 30 comprehensive unit and integration tests with an 88.5% benchmark pass rate and 0.0% entitlement leakage. Thank you."*
+  > *Our automated Pytest suite covers 44 comprehensive unit and integration tests (including 27 live evaluation benchmark scenarios) with a 100.0% benchmark pass rate and 0.0% entitlement leakage. Thank you."*
