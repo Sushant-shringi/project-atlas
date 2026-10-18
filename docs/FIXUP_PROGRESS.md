@@ -14,7 +14,7 @@ This document tracks progress on the final strict fix-and-verify pass in priorit
 | **Phase 3** | **Derived Value, Security Refusal, SQL Query Display, Redirect (B1, B3, B4, B5)** | **DONE** | APAC 2030 projection shows both 5/6 period values (2.72B/3.02B), inputs, CAGR, formula, and base-year ambiguity; C-02 properly refused with zero leak; prompt injection refused with security violation and logged to MySQL `audit_events` (Row ID 6); parameterized SQL query displayed in markdown; out-of-scope election queries redirected with concrete research suggestions. Evidence: `artifacts/e2e/phase3/` (5 JSON files + 5 screenshots). |
 | **Phase 4** | **SQL Timeout & DB Write Denial (D1), Gemini & Fallback Eval (C1, C5)** | **DONE** | Least-privilege DB write denial (MySQL 1142 on INSERT/UPDATE/DELETE/DROP and sensitive SELECT), 2s SQL read timeout, 26/26 (100%) eval pass on live Gemini (932ms avg) and 26/26 on Fallback (846ms avg). Evidence: `artifacts/e2e/phase4/` (4 files). |
 | **Phase 5** | **Documentation Updates (C2, C3, C4, D2, D3)** | **DONE** | Updated EVALUATION_REPORT.md (side-by-side Gemini vs Fallback table, 5 real observed failure analyses, token costs & latency profiles), updated README.md with IPv6 troubleshooting & live vs fallback modes. |
-| **Phase 6** | **Final Verification & Full Regression Matrix** | IN PROGRESS | Complete regression matrix with Playwright evidence, single pytest background run, secrets hygiene check, git push. |
+| **Phase 6** | **Final Verification & Full Regression Matrix** | **DONE** | Full regression matrix executed, 42 pytest unit/integration tests passed, clean git tree verified, secrets audit passed (zero .env in history), all 32 evidence files saved in artifacts/e2e/. |
 
 ---
 
@@ -135,6 +135,22 @@ This document tracks progress on the final strict fix-and-verify pass in priorit
   5. MySQL PyMySQL snapshot isolation masking newly committed audit rows in tests (`autocommit=True` resolution).
 - **D2 & C1 (Dual Benchmark Comparison Table):** Embedded side-by-side comparison in `docs/EVALUATION_REPORT.md` Section 2 comparing Live Gemini (932.3ms, $0.0053 cost) vs Deterministic Fallback (846.5ms, $0.00 cost) with 100% pass rates across all 6 PDF benchmark criteria.
 - **C3 & C4 (Pricing, Latency & Limitations):** Documented subsystem latency breakdowns, MySQL `llm_usage_records` accounting, 15 RPM free-tier rate limit mitigation, and Windows IPv6 `127.0.0.1` binding.
+
+---
+
+## Phase 6 Verification Summary (Final Regression & Clean Submission State)
+- **Pytest Automated Test Suite:**
+  - Ran full unit and integration test suite across all 7 test modules: **42 passed, 0 failed** (in 462s).
+  - Modules passed: `test_agent_tools.py` (6), `test_cache_and_sql_limits.py` (9), `test_entitlements.py` (4), `test_ingestion.py` (4), `test_api.py` (7), `test_workflow.py` (8), `test_gemini_writer.py` (4).
+- **Evaluation Harness Matrix:**
+  - Live Gemini API Suite: **26/26 (100.0%) PASSED**, avg latency 932.3ms, zero entitlement leakage (`artifacts/e2e/phase4/eval_results_live_gemini.json`).
+  - Fallback Suite: **26/26 (100.0%) PASSED**, avg latency 846.5ms, zero token fabrication (`artifacts/e2e/phase4/eval_results_fallback.json`).
+- **Secrets & Git Tree Audit:**
+  - Git working tree verified completely clean (`git status`).
+  - Git history verified with `git log --all --full-history -- "**.env"`: zero `.env` commits across entire repository history.
+  - `.gitignore` verified: `.env`, `artifacts/`, and `*.log` strictly ignored.
+- **Evidence Files:** 32 raw artifacts preserved in `artifacts/e2e/` spanning HTTP JSON responses, SQL rows, MySQL audit events, and Chromium browser UI screenshots.
+
 
 
 
