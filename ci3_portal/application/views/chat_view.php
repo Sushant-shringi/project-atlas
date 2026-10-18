@@ -151,6 +151,22 @@
                         <em>Select a sample query below or type your research question.</em>
                     </div>
                 </div>
+                <?php if (!empty($messages)): ?>
+                    <?php foreach ($messages as $msg): ?>
+                        <div class="message message-<?php echo htmlspecialchars($msg['role']); ?>">
+                            <div class="bubble">
+                                <?php echo nl2br(htmlspecialchars($msg['content'])); ?>
+                                <?php if (!empty($msg['metadata']['citations'])): ?>
+                                    <div class="citations-container">
+                                        <?php foreach ($msg['metadata']['citations'] as $c): ?>
+                                            <span class="citation-chip"><i class="fa-solid fa-bookmark"></i> [<?php echo htmlspecialchars($c['report_id']); ?><?php echo !empty($c['page']) ? ', p.' . htmlspecialchars($c['page']) : ''; ?>] <?php echo htmlspecialchars($c['title'] ?? ''); ?></span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
 
             <div class="quick-prompts">
