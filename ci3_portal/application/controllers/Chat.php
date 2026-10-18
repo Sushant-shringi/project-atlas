@@ -124,12 +124,17 @@ class Chat extends CI_Controller {
      */
     public function switch_client() {
         $new_client = $this->input->post('client_id', TRUE);
+        if (empty($new_client)) {
+            $new_client = $this->input->post('client_btn', TRUE);
+        }
         if (in_array($new_client, array('C-01', 'C-02'))) {
             $this->session->set_userdata('atlas_client_id', $new_client);
-            $this->conversation_model->new_conversation();
+            $this->conversation_model->get_active_conversation_id();
         }
-        redirect('/chat');
+        header('Location: /chat');
+        exit;
     }
+
 
     /**
      * Returns JSON list of escalations for the current client.
