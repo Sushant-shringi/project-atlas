@@ -109,10 +109,11 @@ class AgentWorkflow:
     def _persist_message(cls, conv_id: str, role: str, content: str, response_data: Optional[Dict] = None):
         """Saves message to conversation_messages table."""
         try:
+            import json
             msg_id = f"msg-{uuid.uuid4().hex[:12]}"
-            citations_json = str(response_data.get("citations")) if response_data else None
-            conflicts_json = str(response_data.get("conflicts")) if response_data else None
-            derived_json = str(response_data.get("derived_values")) if response_data else None
+            citations_json = json.dumps(response_data.get("citations", [])) if response_data and response_data.get("citations") is not None else None
+            conflicts_json = json.dumps(response_data.get("conflicts", [])) if response_data and response_data.get("conflicts") is not None else None
+            derived_json = json.dumps(response_data.get("derived_values", [])) if response_data and response_data.get("derived_values") is not None else None
             confidence = response_data.get("confidence") if response_data else None
             escalated = 1 if (response_data and response_data.get("escalated")) else 0
             latency_ms = response_data.get("latency_ms") if response_data else None

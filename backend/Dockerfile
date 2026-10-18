@@ -14,7 +14,8 @@ WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --retries 5 --timeout 60 --no-cache-dir -r requirements.txt
 
 # Pre-download SentenceTransformer model to local HuggingFace cache during build
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"

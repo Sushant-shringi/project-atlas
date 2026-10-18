@@ -110,10 +110,19 @@ docker compose up --build -d
 ```
 
 #### Service URLs & Health Checks
-- **CodeIgniter 3 Enterprise Portal:** [http://localhost:8080](http://localhost:8080)
-- **FastAPI Interactive Docs & Swagger:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **FastAPI Health Endpoint:** [http://localhost:8000/health](http://localhost:8000/health)
-- **Qdrant Vector DB Console:** [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
+- **CodeIgniter 3 Enterprise Portal:** [http://127.0.0.1:8080](http://127.0.0.1:8080) (or [http://localhost:8080](http://localhost:8080))
+- **FastAPI Interactive Docs & Swagger:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) (or [http://localhost:8000/docs](http://localhost:8000/docs))
+- **FastAPI Health Endpoint:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- **Qdrant Vector DB Console:** [http://127.0.0.1:6333/dashboard](http://127.0.0.1:6333/dashboard)
+
+> [!IMPORTANT]
+> **Windows Host Networking (`127.0.0.1` vs `localhost`):** On Windows 10/11 machines, `localhost` can resolve to IPv6 `[::1]`, causing Docker container port forwarding to time out or return empty responses. Always use `http://127.0.0.1:8080` and `http://127.0.0.1:8000` when connecting from the host.
+
+#### Measured Clean-Start Benchmark Timings
+- **Cold Start (from scratch):** **6m 48s** (measured via `docker compose down -v && docker compose up --build -d`, including downloading optimized PyTorch CPU wheels `~150MB` instead of CUDA `~2.5GB`, initializing MySQL schema/seeds, and pre-loading embedding models).
+- **Warm Restart:** **35s** (measured via `docker compose restart`).
+- **First Live Gemini Query Latency:** **7.1s** (includes Qdrant vector retrieval, LangGraph agent routing, Google Gemini API synthesis, Fact-Checker Critic verification, and token/cost logging to MySQL).
+
 
 ### Path B: Native Python Reproduction (Host Environment)
 
@@ -242,20 +251,22 @@ All assignment deliverables, design records, and walkthrough scripts are organiz
 
 1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Detailed system architecture, data flows, threat model, and privilege boundaries.
 2. [docs/EVALUATION_REPORT.md](docs/EVALUATION_REPORT.md): Evaluation benchmark report, 26-scenario matrix, and the **5 Detailed Failure Analyses** (Section 19).
-3. [docs/CI3_VERIFICATION.md](docs/CI3_VERIFICATION.md): Verification matrix for CodeIgniter 3 CSRF, server-side session identity, XSS escaping, timeout resilience, and cURL proofs.
-4. [docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md](docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md): 1-page engineering evolution roadmap (Hybrid RRF search, LangGraph CRAG, OAuth2 PKCE).
-5. [docs/AI_DISCLOSURE.md](docs/AI_DISCLOSURE.md): Transparent disclosure of AI assistant usage and human engineering verification.
-6. [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md): 3–5 minute step-by-step video demonstration script for reviewers.
+3. [docs/E2E_TEST_REPORT.md](docs/E2E_TEST_REPORT.md): Comprehensive End-to-End Test and Verification Report, raw terminal proofs for live Gemini token/cost logging, CI3 portal browser workflow, 16-scenario pass matrix, and clean-start benchmarks.
+4. [docs/CI3_VERIFICATION.md](docs/CI3_VERIFICATION.md): Verification matrix for CodeIgniter 3 CSRF, server-side session identity, XSS escaping, timeout resilience, and cURL proofs.
+5. [docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md](docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md): 1-page engineering evolution roadmap (Hybrid RRF search, LangGraph CRAG, OAuth2 PKCE).
+6. [docs/AI_DISCLOSURE.md](docs/AI_DISCLOSURE.md): Transparent disclosure of AI assistant usage and human engineering verification.
+7. [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md): 3–5 minute step-by-step video demonstration script for reviewers.
 
 ---
 
 ## 👥 Seed Accounts for Demonstration
 
-| Client ID | Company Name | Authorized Reports | API Key Header (`X-Client-Key`) |
-| :--- | :--- | :--- | :--- |
-| **C-01** | Northwind Utilities | R-101 (Paid), R-102 (Public Excerpt), R-103 (Paid) | `test-client-key-c01` |
-| **C-02** | Blue Delta Infra | R-102 (Public Excerpt), R-103 (Paid) | `test-client-key-c02` |
-| **Admin** | Internal CMR Admin | Administrative Management (`/ingest`, `/escalations`) | `test-admin-secret-key-atlas` |
+| Client ID | Company Name | Authorized Reports | Database Seed Key (`X-Client-Key`) | Standalone Test Key |
+| :--- | :--- | :--- | :--- | :--- |
+| **C-01** | Northwind Utilities | R-101 (Paid), R-102 (Public Excerpt), R-103 (Paid) | `client_key_c01_northwind_utilities_secret_2026` | `test-client-key-c01` |
+| **C-02** | Blue Delta Infra | R-102 (Public Excerpt), R-103 (Paid) | `client_key_c02_blue_delta_infra_secret_2026` | `test-client-key-c02` |
+| **Admin** | Internal CMR Admin | Administrative Management (`/ingest`, `/escalations`) | `test-admin-secret-key-atlas` | `test-admin-secret-key-atlas` |
+
 
 ---
 

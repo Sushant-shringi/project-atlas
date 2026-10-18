@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 // Backend Python FastAPI Base URL
 $config['atlas_api_base_url'] = getenv('API_BASE_URL') ?: 'http://api:8000';
-$config['atlas_api_timeout'] = 30; // Seconds
+$config['atlas_api_timeout'] = 45; // Seconds
 
 // Server-Side Client API Key Mapping (Strictly kept server-side; NEVER leaked to browser!)
 $config['atlas_client_keys'] = array(

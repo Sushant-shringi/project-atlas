@@ -73,6 +73,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - ./backend/app:/app/app
       - ./reports:/app/reports:ro
     depends_on:
       mysql:
@@ -105,6 +106,8 @@ services:
       - MYSQL_PASSWORD=atlas_app_secure_password
     ports:
       - "8080:80"
+    volumes:
+      - ./ci3_portal/application:/var/www/html/application
     depends_on:
       api:
         condition: service_healthy

@@ -164,14 +164,7 @@ def node_router(state: AgentState) -> Dict[str, Any]:
                     {"report_id": "R-102", "title": "Smart Metering Technology Excerpt", "page": 14, "scope": "Hardware only"}
                 ],
                 "confidence": 0.85,
-                "conflicts": [{
-                    "metric": "smart_water_meter_market_2024",
-                    "sources": [
-                        {"report_id": "R-101", "value": 4.21, "scope": "Hardware, software, services"},
-                        {"report_id": "R-102", "value": 3.87, "scope": "Hardware only"}
-                    ],
-                    "resolution": "Different scope definition; averaging prohibited."
-                }],
+                "conflicts": ConflictDetector.analyze_conflicts([{"report_id": "R-101"}, {"report_id": "R-102"}], "C-01"),
                 "derived_values": [],
                 "escalated": False,
                 "refusal_reason": None,
@@ -486,9 +479,10 @@ def node_escalation(state: AgentState) -> Dict[str, Any]:
 
     # Persist conversation messages in MySQL
     try:
-        citations_json = str(state.get("citations", []))
-        conflicts_json = str(state.get("conflicts", []))
-        derived_json = str(state.get("derived_values", []))
+        import json
+        citations_json = json.dumps(state.get("citations", []))
+        conflicts_json = json.dumps(state.get("conflicts", []))
+        derived_json = json.dumps(state.get("derived_values", []))
         escalated_val = 1 if requires_escalation else 0
 
         sql = """
@@ -515,7 +509,9 @@ def node_escalation(state: AgentState) -> Dict[str, Any]:
     return {
         "answer": answer_text,
         "escalation_id": escalation_id,
-        "latency_ms": latency_ms
+        "latency_ms": latency_ms,
+        "llm_mode": state.get("llm_mode", "fallback"),
+        "fallback_reason": state.get("fallback_reason")
     }
 
 

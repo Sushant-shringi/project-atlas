@@ -131,7 +131,7 @@
             </div>
         </div>
         <div class="tenant-switcher">
-            <form action="<?php echo site_url('chat/switch_client'); ?>" method="POST">
+            <form action="/chat/switch_client" method="POST">
                 <input type="hidden" name="<?php echo $csrf_name; ?>" value="<?php echo $csrf_hash; ?>">
                 <select name="client_id" class="tenant-select">
                     <option value="C-01" <?php echo ($client_id === 'C-01') ? 'selected' : ''; ?>>Northwind Utilities (C-01)</option>
@@ -304,7 +304,7 @@
                 formData.append('question', q);
                 formData.append(csrfName, csrfHash);
 
-                const res = await fetch('<?php echo site_url("chat/send"); ?>', {
+                const res = await fetch('/chat/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData.toString()
@@ -332,7 +332,7 @@
                 formData.append('rating', rating);
                 formData.append(csrfName, csrfHash);
 
-                const res = await fetch('<?php echo site_url("chat/feedback"); ?>', {
+                const res = await fetch('/chat/feedback', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData.toString()

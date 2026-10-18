@@ -15,7 +15,9 @@ SUSPICIOUS_PATTERNS = [
     re.compile(r"print\s+the\s+full\s+contents?\s+of\s+(the\s+)?clients?\s+table", re.IGNORECASE),
     re.compile(r"system\s+prompt\s+override", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+in\s+DAN\s+mode", re.IGNORECASE),
-    re.compile(r"reveal\s+(your\s+)?(secret|api_key|system\s+prompt|password)", re.IGNORECASE),
+    re.compile(r"repeat\s+(your\s+)?(system\s+prompt|developer\s+instructions|instructions)", re.IGNORECASE),
+    re.compile(r"reveal\s+(your\s+)?(secret|api_key|system\s+prompt|password|credentials|api\s+credentials)", re.IGNORECASE),
+    re.compile(r"\b(system\s+prompt|developer\s+instructions|api\s+credentials)\b", re.IGNORECASE),
     re.compile(r"drop\s+table", re.IGNORECASE),
     re.compile(r"delete\s+from\s+reports", re.IGNORECASE),
 ]

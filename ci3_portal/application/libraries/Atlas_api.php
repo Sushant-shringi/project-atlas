@@ -18,7 +18,7 @@ class Atlas_api {
         $this->CI->load->config('atlas_api', TRUE);
         $raw_url = $this->CI->config->item('atlas_api_base_url', 'atlas_api') ?: 'http://api:8000';
         $this->base_url = rtrim((string)$raw_url, '/');
-        $this->timeout = $this->CI->config->item('atlas_api_timeout', 'atlas_api') ?: 25;
+        $this->timeout = $this->CI->config->item('atlas_api_timeout', 'atlas_api') ?: 45;
         $this->client_keys = $this->CI->config->item('atlas_client_keys', 'atlas_api') ?: array();
     }
 
