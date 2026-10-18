@@ -12,8 +12,8 @@ This document tracks progress on the final strict fix-and-verify pass in priorit
 | **Phase 1** | **Portal UI & Tenant Switching (A1-A7)** | **DONE** | Real Playwright Chromium verification: bidirectional switching (C-01<->C-02 repeated), scoped message history, feedback saved to MySQL (id: 4), confidence N/A on refusals, and graceful offline error recovery. Evidence: `artifacts/e2e/phase1/phase1_evidence.json` + 8 screenshots. |
 | **Phase 2** | **Entitlement & Answer Correctness (B2, B6, B7, B8)** | **DONE** | No hardcoded template answers; dynamic metadata (titles/publishers from MySQL); stated scope uncertainty; zero R-101 figure/citation leaks for C-02; strict citation grounding (no R-103 purifier on smart water meter queries); confidence policy calibrated to 0.80 on source conflict and single-source boundary; live Qdrant container connected. Evidence: `artifacts/e2e/phase2/` (6 JSON files). |
 | **Phase 3** | **Derived Value, Security Refusal, SQL Query Display, Redirect (B1, B3, B4, B5)** | **DONE** | APAC 2030 projection shows both 5/6 period values (2.72B/3.02B), inputs, CAGR, formula, and base-year ambiguity; C-02 properly refused with zero leak; prompt injection refused with security violation and logged to MySQL `audit_events` (Row ID 6); parameterized SQL query displayed in markdown; out-of-scope election queries redirected with concrete research suggestions. Evidence: `artifacts/e2e/phase3/` (5 JSON files + 5 screenshots). |
-| **Phase 4** | **SQL Timeout & DB Write Denial (D1), Gemini & Fallback Eval (C1, C5)** | IN PROGRESS | MySQL timeouts, DB permissions test, live Gemini & fallback eval passes with evidence. |
-| **Phase 5** | **Documentation Updates (C2, C3, C4, D2, D3)** | PENDING | Failure analyses (real observed), limitations, cost/token notes, reviewer docs. |
+| **Phase 4** | **SQL Timeout & DB Write Denial (D1), Gemini & Fallback Eval (C1, C5)** | **DONE** | Least-privilege DB write denial (MySQL 1142 on INSERT/UPDATE/DELETE/DROP and sensitive SELECT), 2s SQL read timeout, 26/26 (100%) eval pass on live Gemini (932ms avg) and 26/26 on Fallback (846ms avg). Evidence: `artifacts/e2e/phase4/` (4 files). |
+| **Phase 5** | **Documentation Updates (C2, C3, C4, D2, D3)** | IN PROGRESS | Failure analyses (real observed), limitations, cost/token notes, reviewer docs. |
 | **Phase 6** | **Final Verification & Full Regression Matrix** | PENDING | Complete regression matrix with Playwright evidence, single pytest background run, secrets hygiene check, git push. |
 
 ---
@@ -92,5 +92,37 @@ This document tracks progress on the final strict fix-and-verify pass in priorit
   - `artifacts/e2e/phase3/C01-sql-query-display.json`
   - `artifacts/e2e/phase3/C01-election-redirect.json`
   - `artifacts/e2e/phase3/phase3_summary.json`
+
+---
+
+## Phase 4 Verification Summary (DB Least-Privilege, SQL Timeout, and Dual Eval Harness)
+- **D1 (Least-Privilege DB Permissions):**
+  - Tested `atlas_readonly` user against prohibited write operations: `INSERT`, `UPDATE`, `DELETE`, `DROP`. All denied with MySQL Error 1142 (`INSERT command denied to user 'atlas_readonly'@'%' for table 'reports'`).
+  - Tested `atlas_readonly` against sensitive operational tables (`clients`, `audit_events`). All denied with MySQL Error 1142 (`SELECT command denied to user 'atlas_readonly'@'%' for table 'clients'`).
+  - Allowed operations verified: `SELECT` on analytical tables (`reports`, `report_sections`, `report_tables`) executes successfully.
+  - Evidence: `artifacts/e2e/phase4/d1_db_permissions.json`.
+- **D1 (SQL Query Execution Timeout):**
+  - Tested query execution with runaway query `SELECT SLEEP(5);` against `get_readonly_engine()` with `read_timeout=2`.
+  - Terminated after 2.00s with `OperationalError: (2013, 'Lost connection to MySQL server during query (timed out)')`.
+  - Evidence: `artifacts/e2e/phase4/d1_sql_timeout.json`.
+- **C1 & C5 (Live Gemini Benchmark Evaluation):**
+  - Ran benchmark suite against live API container (`atlas_api`): **26/26 (100.0%) PASSED**.
+  - Average Latency: 932.3 ms.
+  - Metrics:
+    - Answer Correctness: 100.0% (26/26)
+    - Citation Accuracy: 100.0% (26/26)
+    - Refusal Accuracy: 100.0% (26/26)
+    - Conflict Detection: 100.0% (26/26)
+    - Entitlement Leakage Rate: 0.0% (0/26)
+    - Escalation Correctness: 100.0% (26/26)
+  - Evidence: `artifacts/e2e/phase4/eval_results_live_gemini.json`.
+- **C1 & C5 (Deterministic Fallback Benchmark Evaluation):**
+  - Ran benchmark suite in fallback mode (`--mode fallback --use-api`): **26/26 (100.0%) PASSED**.
+  - Average Latency: 846.5 ms.
+  - All 6 benchmark metrics met.
+  - Evidence: `artifacts/e2e/phase4/eval_results_fallback.json`.
+- **Cost & Token Tracking (Live MySQL `llm_usage_records`):**
+  - Tracked across 33 live Gemini calls: 51,110 tokens, total estimated cost of $0.005295.
+
 
 

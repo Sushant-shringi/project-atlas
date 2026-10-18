@@ -100,11 +100,17 @@ class FactCheckerCritic:
         # Check if retrieved chunks actually address the specific topic of the question
         q_words = set(re.findall(r"\w+", question.lower()))
         combined_text = " ".join([c.get("text", "").lower() for c in retrieved_chunks])
-        # Find material topic words (>5 chars) in question
-        topic_words = [w for w in q_words if len(w) > 5 and w not in {"market", "global", "report", "growth", "valuation", "projected"}]
+        # Find material topic words (>4 chars) excluding common domain boilerplate
+        generic_domain_words = {
+            "market", "global", "report", "growth", "valuation", "projected", "industry",
+            "revenue", "forecast", "annual", "analysis", "meters", "meter", "sensor", "sensors",
+            "system", "systems", "device", "devices", "purifier", "purifiers", "about", "which",
+            "where", "state", "total"
+        }
+        topic_words = [w for w in q_words if len(w) > 4 and w not in generic_domain_words]
         overlap = [w for w in topic_words if w in combined_text]
         if topic_words and len(overlap) == 0 and not derived_values:
-            score = 0.40
+            score = 0.35
             flags.append("Retrieved documents do not contain evidence for query topic (obscure or missing concept).")
 
         # If answer indicates refusal or unable to find
@@ -130,7 +136,7 @@ class FactCheckerCritic:
 
         # Confidence Policy Rule 1: Conflicting sources present
         if conflicts:
-            score = 0.80
+            score = min(score, 0.80)
             flags.append("Confidence adjusted to 0.80 due to multi-source scope discrepancy (no averaging).")
 
         # Confidence Policy Rule 2: Single-source boundary (e.g. C-02 smart water meter relying solely on R-102)
@@ -139,7 +145,7 @@ class FactCheckerCritic:
             chunk_swm_ids = {c.get("report_id") for c in retrieved_chunks if c.get("report_id") and "meter" in (c.get("title", "") + c.get("text", "")).lower()}
             active_swm_ids = c_report_ids if c_report_ids else chunk_swm_ids
             if "R-102" in active_swm_ids and "R-101" not in active_swm_ids:
-                score = 0.80
+                score = min(score, 0.80)
                 flags.append("Confidence adjusted to 0.80 due to single-source visibility (unpurchased comprehensive study exists).")
 
         # Clamp score between 0.0 and 1.0

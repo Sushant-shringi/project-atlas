@@ -27,7 +27,7 @@ from app.services.ingestion import IngestionService
 from eval.scenarios import EVALUATION_SCENARIOS
 
 
-def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.json") -> Dict[str, Any]:
+def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.json", use_api: bool = False) -> Dict[str, Any]:
     print("=" * 80)
     print(f"PROJECT ATLAS — EVALUATION BENCHMARK RUNNER [Mode: {mode.upper()}]")
     print("=" * 80)
@@ -39,11 +39,30 @@ def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.js
     else:
         print("  [Config] Using environment Gemini key configuration.")
 
-    # 1. Ingest reports into vector store
-    reports_dir = str(Path(__file__).parent.parent / "reports")
-    print(f"\n[1/3] Verifying vector database indexing from: {reports_dir}")
-    ingest_res = IngestionService.ingest_directory(reports_dir, collection_name="report_chunks")
-    print(f"      Indexed {ingest_res['chunks_indexed']} chunks across {ingest_res['reports_ingested']} reports.")
+    # Check for live API access
+    client_keys = {}
+    if use_api or mode == "gemini":
+        try:
+            import pymysql
+            conn = pymysql.connect(
+                host="127.0.0.1", port=3307, user="atlas_app", password="atlas_app_secure_password", database="project_atlas", cursorclass=pymysql.cursors.DictCursor
+            )
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, api_key FROM clients")
+                client_keys = {r["id"]: r["api_key"] for r in cur.fetchall()}
+            conn.close()
+            use_api = True
+            print("  [Config] Executing via live FastAPI container (http://127.0.0.1:8000).")
+        except Exception as e:
+            print(f"  [Config] Could not connect to MySQL for API keys ({e}), using in-process workflow.")
+            use_api = False
+
+    # 1. Ingest reports into vector store (if in-process)
+    if not use_api:
+        reports_dir = str(Path(__file__).parent.parent / "reports")
+        print(f"\n[1/3] Verifying vector database indexing from: {reports_dir}")
+        ingest_res = IngestionService.ingest_directory(reports_dir, collection_name="report_chunks")
+        print(f"      Indexed {ingest_res['chunks_indexed']} chunks across {ingest_res['reports_ingested']} reports.")
 
     # Import AgentWorkflow after configuration
     from app.agent.workflow import AgentWorkflow
@@ -73,6 +92,8 @@ def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.js
     escalation_correct_count = 0
     escalation_total_eval = 0
 
+    import requests
+
     for tc in EVALUATION_SCENARIOS:
         tc_id = tc["id"]
         category = tc["category"]
@@ -80,9 +101,21 @@ def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.js
         question = tc["question"]
 
         t0 = time.time()
-        res = AgentWorkflow.process_chat(client_id=client_id, question=question)
+        if use_api:
+            api_resp = requests.post(
+                "http://127.0.0.1:8000/chat",
+                json={"client_id": client_id, "question": question},
+                headers={"X-Client-Key": client_keys.get(client_id, "")},
+                timeout=40
+            )
+            res = api_resp.json()
+        else:
+            res = AgentWorkflow.process_chat(client_id=client_id, question=question)
         latency_ms = int((time.time() - t0) * 1000)
         total_latency_ms += latency_ms
+
+        if mode != "fallback":
+            time.sleep(2.0)
 
         passed = True
         failure_reasons = []
@@ -96,6 +129,7 @@ def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.js
                 bool(res.get("refusal_reason")) or
                 "access restricted" in ans_lower or
                 "security refusal" in ans_lower or
+                "security policy violation" in ans_lower or
                 "out-of-scope notice" in ans_lower or
                 "refused" in ans_lower
             )
@@ -261,7 +295,8 @@ def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.js
     }
 
     # Save to JSON
-    json_path = Path(__file__).parent / output_file
+    json_path = Path(output_file) if (Path(output_file).is_absolute() or str(output_file).startswith("artifacts")) else Path(__file__).parent / output_file
+    json_path.parent.mkdir(parents=True, exist_ok=True)
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(evaluation_output, f, indent=2)
     print(f"      Saved JSON report to: {json_path}")
@@ -273,6 +308,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="auto", choices=["auto", "gemini", "fallback"])
     parser.add_argument("--output", default="evaluation_results.json")
+    parser.add_argument("--use-api", action="store_true", help="Execute evaluation against live running FastAPI container")
     args = parser.parse_args()
 
-    run_evaluation(mode=args.mode, output_file=args.output)
+    run_evaluation(mode=args.mode, output_file=args.output, use_api=args.use_api)

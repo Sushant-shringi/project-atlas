@@ -193,24 +193,38 @@ class DatabaseManager:
         """
         import socket
         is_mysql_up = False
+        host = settings.MYSQL_HOST
+        port = settings.MYSQL_PORT
+
         try:
-            with socket.create_connection((settings.MYSQL_HOST, settings.MYSQL_PORT), timeout=0.2):
+            with socket.create_connection((host, port), timeout=0.5):
                 is_mysql_up = True
         except OSError:
-            is_mysql_up = False
+            # If on host machine, Docker maps MySQL 3306 -> 3307 on 127.0.0.1
+            if host in ("mysql", "127.0.0.1", "localhost"):
+                try:
+                    with socket.create_connection(("127.0.0.1", 3307), timeout=0.5):
+                        is_mysql_up = True
+                        host = "127.0.0.1"
+                        port = 3307
+                except OSError:
+                    is_mysql_up = False
 
         if is_mysql_up:
             try:
                 user = settings.MYSQL_READONLY_USER if readonly else settings.MYSQL_USER
                 password = settings.MYSQL_READONLY_PASSWORD if readonly else settings.MYSQL_PASSWORD
                 conn = pymysql.connect(
-                    host=settings.MYSQL_HOST,
-                    port=settings.MYSQL_PORT,
+                    host=host,
+                    port=port,
                     user=user,
                     password=password,
                     database=settings.MYSQL_DATABASE,
                     cursorclass=pymysql.cursors.DictCursor,
-                    autocommit=not readonly
+                    autocommit=not readonly,
+                    connect_timeout=5,
+                    read_timeout=5 if readonly else 30,
+                    write_timeout=5 if readonly else 30
                 )
                 return conn
             except Exception as e:
