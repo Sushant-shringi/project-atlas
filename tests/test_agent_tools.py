@@ -30,12 +30,14 @@ def test_market_calculator_cagr_formula():
     # Test APAC 2030 smart water meter calculation
     calc = MarketCalculator.compute_apac_smart_water_meter_2030()
     assert calc["derived_value"] == 2.72
+    assert calc["alternative_6_period_value"] == 3.02
     assert calc["base_value"] == 1.5998
     assert calc["base_year"] == 2024
     assert calc["target_year"] == 2030
     assert calc["cagr_applied"] == 11.20
     assert len(calc["assumptions"]) >= 2
-    assert "FV = PV_apac * (1 + CAGR_global)^5" in calc["formula"]
+    assert "n=5 for 2025-2030 window; n=6 from 2024 base" in calc["formula"]
+    assert "base_year_ambiguity" in calc
 
 
 def test_extrapolation_bounds():
