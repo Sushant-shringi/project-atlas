@@ -88,7 +88,7 @@ In accordance with Section 19 of the master implementation specification, the fo
 
 ---
 
-### Failure 1: External LLM API Key Invalidation & Graceful Fallback Failure
+### Failure 1: External LLM API Key Invalidation & Graceful Fallback Failure [Observed during development]
 - **Origin:** **Observed during development**
 - **Category:** Infrastructure / External Dependency Resiliency
 - **Trigger / Input:** Chat query executed in an environment where `GEMINI_API_KEY` was missing, revoked, or returned a 403 PermissionDenied ("API key was reported as leaked").
@@ -101,7 +101,7 @@ In accordance with Section 19 of the master implementation specification, the fo
 
 ---
 
-### Failure 2: Query Router Intent Collision Between "Weather Forecast" and "Market Forecast"
+### Failure 2: Query Router Intent Collision Between "Weather Forecast" and "Market Forecast" [Observed during development]
 - **Origin:** **Observed during development**
 - **Category:** Natural Language Understanding / Query Routing Precedence
 - **Trigger / Input:** `"What is the current weather forecast for Tokyo?"`
@@ -114,7 +114,7 @@ In accordance with Section 19 of the master implementation specification, the fo
 
 ---
 
-### Failure 3: Fallback Synthesizer Scope Metadata Parsing Omission
+### Failure 3: Fallback Synthesizer Scope Metadata Parsing Omission [Observed during development]
 - **Origin:** **Observed during development**
 - **Category:** Information Extraction & Synthesis
 - **Trigger / Input:** `"What is the scope of report R-101 compared to R-102?"`
@@ -126,7 +126,7 @@ In accordance with Section 19 of the master implementation specification, the fo
 
 ---
 
-### Failure 4: Semantic Drift & False Positives on Obscure Market Inquiries
+### Failure 4: Semantic Drift & False Positives on Obscure Market Inquiries [Produced by controlled fault injection]
 - **Origin:** **Produced by controlled fault injection**
 - **Category:** Retrieval Quality & Critic Calibration
 - **Trigger / Input:** `"What is the obscure quantum-gravitational water sensor market valuation in 2024?"` (**AB-Q10**)
@@ -139,7 +139,7 @@ In accordance with Section 19 of the master implementation specification, the fo
 
 ---
 
-### Failure 5: Tenant Identity Spoofing via Header vs. Body Key Mismatch
+### Failure 5: Tenant Identity Spoofing via Header vs. Body Key Mismatch [Produced by controlled fault injection]
 - **Origin:** **Produced by controlled fault injection**
 - **Category:** Application Security & Multi-Tenant Entitlement Integrity
 - **Trigger / Input:** An HTTP request presenting Client C-02's API key in `X-Client-Key` while specifying `client_id: "C-01"` in the JSON request body.
