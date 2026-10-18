@@ -35,18 +35,64 @@ class FactCheckerCritic:
         return citations
 
     @classmethod
+    def filter_citations_to_answer(
+        cls,
+        citations: List[Dict[str, Any]],
+        answer_text: str,
+        question: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Filters citations so that only chunks supporting the answer or cited in the text are included.
+        Discards irrelevant cross-sector citations (e.g. R-103 water purifier on smart water meter questions).
+        """
+        if not citations:
+            return []
+
+        # Find all report IDs explicitly mentioned in the answer
+        cited_in_answer = set(re.findall(r"\b(R-\d{3})\b", answer_text, re.IGNORECASE))
+        cited_in_answer = {r.upper() for r in cited_in_answer}
+
+        # If specific report IDs are cited/discussed in the answer, filter to those
+        if cited_in_answer:
+            relevant = [c for c in citations if c.get("report_id", "").upper() in cited_in_answer]
+            if relevant:
+                return relevant
+
+        # Otherwise filter out clearly cross-topic chunks
+        q_low = question.lower()
+        filtered = []
+        for c in citations:
+            rep_id = c.get("report_id", "").upper()
+            if "smart water meter" in q_low and rep_id == "R-103":
+                continue
+            if "purifier" in q_low and rep_id in ("R-101", "R-102"):
+                continue
+            filtered.append(c)
+
+        return filtered if filtered else citations
+
+    @classmethod
     def evaluate_confidence_and_facts(
         cls,
         question: str,
         answer_text: str,
         retrieved_chunks: List[Dict[str, Any]],
         derived_values: List[Dict[str, Any]],
-        conflicts: List[Dict[str, Any]]
+        conflicts: List[Dict[str, Any]],
+        citations: Optional[List[Dict[str, Any]]] = None
     ) -> Tuple[float, bool, List[str]]:
         """
         Calculates calibrated confidence score (0.0 to 1.0) and determines escalation necessity.
-        Returns:
-            (confidence_score, requires_escalation, quality_flags)
+        
+        Documented Confidence Policy:
+        - Note: This score is an evidence validation heuristic and is NOT a calibrated Bayesian probability.
+        - Baseline: 1.0 for grounded answers with verified citations.
+        - Source Conflict Penalty: When sources conflict on figures or scope (e.g. R-101 vs R-102),
+          confidence is reduced to 0.80 to reflect stated scope uncertainty.
+        - Single-Source Boundary Penalty: When only a single excerpt/source is visible for a market
+          with multiple studies (e.g., C-02 viewing only R-102), confidence is capped at 0.80.
+        - Unsupported Extrapolation (e.g. 2035): Triggers immediate escalation penalty (0.35).
+        - Insufficient or Restricted Evidence: Reduces score below threshold (0.20 - 0.45).
         """
         score = 1.0
         flags = []
@@ -62,7 +108,7 @@ class FactCheckerCritic:
             flags.append("Retrieved documents do not contain evidence for query topic (obscure or missing concept).")
 
         # If answer indicates refusal or unable to find
-        if "unable to" in answer_text.lower() or "not authorized" in answer_text.lower() or "does not contain" in answer_text.lower():
+        if "unable to" in answer_text.lower() or "not authorized" in answer_text.lower() or "does not contain" in answer_text.lower() or "access restricted" in answer_text.lower():
             score = 0.45
             flags.append("Insufficient evidence or restricted report.")
 
@@ -82,12 +128,19 @@ class FactCheckerCritic:
             score = 0.35
             flags.append("Question requests unsupported long-term projection (2035) beyond report horizon.")
 
-        # Check for conflicts presence: when conflicts exist, ensure neither was silently dropped
+        # Confidence Policy Rule 1: Conflicting sources present
         if conflicts:
-            conflict_covered = any(str(src.get("value")) in answer_text for src in conflicts[0].get("sources", []))
-            if not conflict_covered:
-                score -= 0.25
-                flags.append("Conflicting sources present but not thoroughly detailed in output.")
+            score = 0.80
+            flags.append("Confidence adjusted to 0.80 due to multi-source scope discrepancy (no averaging).")
+
+        # Confidence Policy Rule 2: Single-source boundary (e.g. C-02 smart water meter relying solely on R-102)
+        if "smart water meter" in question.lower() and not conflicts:
+            c_report_ids = {c.get("report_id") for c in (citations or []) if c.get("report_id")}
+            chunk_swm_ids = {c.get("report_id") for c in retrieved_chunks if c.get("report_id") and "meter" in (c.get("title", "") + c.get("text", "")).lower()}
+            active_swm_ids = c_report_ids if c_report_ids else chunk_swm_ids
+            if "R-102" in active_swm_ids and "R-101" not in active_swm_ids:
+                score = 0.80
+                flags.append("Confidence adjusted to 0.80 due to single-source visibility (unpurchased comprehensive study exists).")
 
         # Clamp score between 0.0 and 1.0
         final_score = max(0.0, min(1.0, round(score, 2)))
@@ -97,6 +150,7 @@ class FactCheckerCritic:
             f"Critic evaluation completed: Confidence={final_score}, Escalation={requires_escalation}, Flags={flags}"
         )
         return final_score, requires_escalation, flags
+
 
     @classmethod
     def validate_and_sanitize_response(

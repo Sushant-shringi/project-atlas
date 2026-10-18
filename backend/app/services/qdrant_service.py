@@ -19,18 +19,26 @@ def get_qdrant_client():
         import socket
         from qdrant_client import QdrantClient
 
+        target_host = settings.QDRANT_HOST
+        target_port = settings.QDRANT_PORT
+        try:
+            socket.gethostbyname(target_host)
+        except OSError:
+            if target_host == "qdrant":
+                target_host = "127.0.0.1"
+
         # Fast socket check to avoid long connection timeout if daemon isn't running on host
         is_port_open = False
         try:
-            with socket.create_connection((settings.QDRANT_HOST, settings.QDRANT_PORT), timeout=0.3):
+            with socket.create_connection((target_host, target_port), timeout=1.0):
                 is_port_open = True
         except OSError:
             is_port_open = False
 
         if is_port_open:
             try:
-                logger.info(f"Connecting to live Qdrant at {settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
-                client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT, timeout=2.0)
+                logger.info(f"Connecting to live Qdrant at {target_host}:{target_port}")
+                client = QdrantClient(host=target_host, port=target_port, timeout=2.0)
                 client.get_collections()
                 _qdrant_client = client
                 logger.info("Successfully connected to live Qdrant instance.")
@@ -40,6 +48,7 @@ def get_qdrant_client():
         else:
             logger.info("Qdrant port not reachable on host; initializing local in-memory Qdrant client.")
             _qdrant_client = QdrantClient(":memory:")
+
     return _qdrant_client
 
 

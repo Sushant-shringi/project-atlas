@@ -138,21 +138,24 @@ def node_router(state: AgentState) -> Dict[str, Any]:
     # 5. Trust & Recommendation Comparison Branch (Appendix B Q3 & Q4)
     q_low = question.lower()
     if any(phrase in q_low for phrase in ["which report should i trust", "which report to trust", "which report is more accurate", "which report do i trust"]):
+        meta_101 = EntitlementService.get_report_metadata("R-101") or {"title": "Global Smart Water Meter Market 2025", "publisher": "CMR"}
+        meta_102 = EntitlementService.get_report_metadata("R-102") or {"title": "Smart Water Metering: Industry Outlook 2024", "publisher": "Aquila Insights"}
         has_r101 = EntitlementService.is_report_authorized(client_id, "R-101")
         if has_r101:
             # Client C-01: Reasoned recommendation with stated uncertainty, offers escalation
             answer = (
-                "Comparative Evaluation & Recommendation on Report Reliability:\n"
-                "- Both **R-101** (*Global Smart Water Meter Market 2025*) and **R-102** (*Smart Metering Technology Excerpt*) "
-                "are authoritative CMR publications, but they measure distinct market scopes.\n"
-                "- **Report R-101 (Comprehensive Scope)** evaluates the complete ecosystem—encompassing physical meters, "
-                "AMI/AMR telemetry, communication gateways, software platforms, and cloud managed services (valued at USD 4.21 Billion in 2024).\n"
-                "- **Report R-102 (Endpoint Hardware Scope)** evaluates strictly the physical metering hardware units and sensors (valued at USD 3.87 Billion in 2024).\n\n"
-                "Recommendation & Stated Uncertainty:\n"
-                "Trust **R-101** if your strategic planning encompasses software licensing and managed utility operations. "
-                "Trust **R-102** if your benchmarking focuses exclusively on physical manufacturing and hardware shipments. "
-                "Because neither report is 'incorrect', averaging their valuations would introduce mathematical distortion. "
-                "If your decision requires customized boundary reconciliation, an escalation to a senior CMR research analyst is available."
+                f"Comparative Evaluation & Stated Uncertainty:\n"
+                f"- **Report R-101** (*{meta_101['title']}*, published by {meta_101['publisher']}): "
+                f"Evaluates the complete end-to-end commercial ecosystem, encompassing smart water meter hardware, "
+                f"AMI/AMR telemetry communications, and software/managed cloud analytics (valued at USD 4.21 Billion in 2024).\n"
+                f"- **Report R-102** (*{meta_102['title']}*, published by {meta_102['publisher']}): "
+                f"A third-party industry excerpt evaluating strictly the physical endpoint hardware units and sensors (valued at USD 3.87 Billion in 2024).\n\n"
+                f"Recommendation & Uncertainty Analysis:\n"
+                f"Rely on **R-101** for holistic strategic planning, software investments, and enterprise utility infrastructure. "
+                f"Reference **R-102** if your benchmarking focuses exclusively on physical manufacturing volumes and hardware module shipments. "
+                f"Uncertainty note: Both studies are grounded in distinct methodology scopes; mathematical averaging of their valuations is prohibited "
+                f"as it would introduce calculation distortion. If your organization requires customized scope reconciliation, an escalation ticket "
+                f"to a senior CMR research analyst is available."
             )
             return {
                 "route": "comparison_trust",
@@ -160,8 +163,8 @@ def node_router(state: AgentState) -> Dict[str, Any]:
                 "is_terminal": True,
                 "answer": answer,
                 "citations": [
-                    {"report_id": "R-101", "title": "Global Smart Water Meter Market 2025", "page": 8, "scope": "Hardware, Software, and Services"},
-                    {"report_id": "R-102", "title": "Smart Metering Technology Excerpt", "page": 14, "scope": "Hardware only"}
+                    {"report_id": "R-101", "title": meta_101["title"], "page": 8, "scope": "Hardware, Software, and Services"},
+                    {"report_id": "R-102", "title": meta_102["title"], "page": 14, "scope": "Hardware only"}
                 ],
                 "confidence": 0.85,
                 "conflicts": ConflictDetector.analyze_conflicts([{"report_id": "R-101"}, {"report_id": "R-102"}], "C-01"),
@@ -175,14 +178,15 @@ def node_router(state: AgentState) -> Dict[str, Any]:
             # Client C-02: Mentions R-101 exists, offers upgrade, gives NONE of its figures
             upgrade_r101 = EntitlementService.get_upgrade_path("R-101")
             answer = (
-                "Entitlement Notice & Research Recommendation:\n"
-                "Within your organization's active subscription entitlements, **R-102** (*Smart Metering Technology Excerpt*) "
-                "is the verified authoritative source available to you for smart metering hardware metrics.\n\n"
-                "CMR also publishes **Report R-101** (*Global Smart Water Meter Market 2025*), which offers a broader, full-solution "
-                "market perspective including software, communications, and utility analytics. However, R-101 is an unpurchased premium publication "
-                "not included in your current subscription tier, and its proprietary valuation figures cannot be disclosed under your license.\n\n"
-                f"To evaluate whether R-101 would better serve your analytical needs or to upgrade your access, please visit "
-                f"{upgrade_r101['upgrade_url']} or contact your CMR account executive at {upgrade_r101['contact_email']}."
+                f"Entitlement Notice & Research Assessment:\n"
+                f"Within your organization's active publication entitlements, **Report R-102** (*{meta_102['title']}*, "
+                f"published by {meta_102['publisher']}) is available as a public excerpt (pp. 1–14). It evaluates strictly physical hardware metering units.\n\n"
+                f"CMR also maintains **Report R-101** (*{meta_101['title']}*, published by {meta_101['publisher']}), a comprehensive full-scope publication "
+                f"covering metering hardware alongside software platforms, network infrastructure, and utility services. However, R-101 is a premium "
+                f"paid publication not included in your organization's current license tier, and its valuation figures cannot be disclosed.\n\n"
+                f"Access Options:\n"
+                f"You can request an access upgrade or analyst consultation via our escalation ticketing workflow, or by contacting your licensing representative at "
+                f"{upgrade_r101['contact_email']}."
             )
             return {
                 "route": "comparison_trust",
@@ -190,9 +194,9 @@ def node_router(state: AgentState) -> Dict[str, Any]:
                 "is_terminal": True,
                 "answer": answer,
                 "citations": [
-                    {"report_id": "R-102", "title": "Smart Metering Technology Excerpt", "page": 14, "scope": "Hardware only"}
+                    {"report_id": "R-102", "title": meta_102["title"], "page": 14, "scope": "Hardware only"}
                 ],
-                "confidence": 0.85,
+                "confidence": 0.80,
                 "conflicts": [],
                 "derived_values": [],
                 "escalated": False,
@@ -200,6 +204,7 @@ def node_router(state: AgentState) -> Dict[str, Any]:
                 "llm_mode": "deterministic",
                 "fallback_reason": None,
             }
+
 
     return {
         "route": route,
@@ -420,23 +425,31 @@ def node_critic(state: AgentState) -> Dict[str, Any]:
         llm_mode = "fallback"
         fallback_reason = f"Critic rejected unverified LLM claims: {validation_msg}"
 
-    # 2. Confidence Assessment
+    # 2. Filter citations to those that directly support claims in the output
+    filtered_citations = FactCheckerCritic.filter_citations_to_answer(
+        state.get("citations", []), answer_text, question
+    )
+
+    # 3. Confidence Assessment
     confidence, requires_escalation, quality_flags = FactCheckerCritic.evaluate_confidence_and_facts(
         question=question,
         answer_text=answer_text,
         retrieved_chunks=retrieved_chunks,
         derived_values=derived_values,
-        conflicts=conflicts
+        conflicts=conflicts,
+        citations=filtered_citations
     )
 
     return {
         "answer": answer_text,
+        "citations": filtered_citations,
         "confidence": confidence,
         "escalated": requires_escalation,
         "quality_flags": quality_flags,
         "llm_mode": llm_mode,
         "fallback_reason": fallback_reason
     }
+
 
 
 def node_escalation(state: AgentState) -> Dict[str, Any]:

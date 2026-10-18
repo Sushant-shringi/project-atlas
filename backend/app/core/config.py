@@ -21,14 +21,14 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-1.5-flash"
 
     # Qdrant Vector DB Settings
-    QDRANT_HOST: str = "localhost"
+    QDRANT_HOST: str = "127.0.0.1"
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION: str = "report_chunks"
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
     VECTOR_DIMENSION: int = 384
 
     # MySQL Operational App Account
-    MYSQL_HOST: str = "localhost"
+    MYSQL_HOST: str = "127.0.0.1"
     MYSQL_PORT: int = 3306
     MYSQL_DATABASE: str = "project_atlas"
     MYSQL_USER: str = "atlas_app"
@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     CONFIDENCE_THRESHOLD: float = 0.70
     MAX_RETRIEVAL_CHUNKS: int = 5
     REQUEST_TIMEOUT_SECONDS: int = 30
+
+    # Licensing / Upgrade Paths
+    UPGRADE_CONTACT_EMAIL: str = "licensing@cognitivemarketresearch.com"
+    UPGRADE_PORTAL_URL: str = "https://portal.cognitivemarketresearch.com/upgrade"
 
     model_config = SettingsConfigDict(
         env_file=".env",

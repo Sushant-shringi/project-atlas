@@ -96,14 +96,19 @@ class EntitlementService:
     @classmethod
     def get_upgrade_path(cls, report_id: str) -> Dict[str, str]:
         """Provides an access upgrade request route when a report is restricted."""
+        import os
+        from app.core.config import settings
         meta = cls.get_report_metadata(report_id)
         title = meta["title"] if meta else f"Report {report_id}"
+        contact_email = os.getenv("UPGRADE_CONTACT_EMAIL", settings.UPGRADE_CONTACT_EMAIL)
+        upgrade_portal = os.getenv("UPGRADE_PORTAL_URL", settings.UPGRADE_PORTAL_URL)
         return {
             "report_id": report_id,
             "title": title,
             "access_status": "Restricted (Paid Subscription Required)",
             "action": "Request Report License Upgrade",
-            "contact_email": "subscriptions@cognitivemarketresearch.com",
-            "upgrade_url": f"https://portal.cognitivemarketresearch.com/reports/{report_id}/upgrade"
+            "contact_email": contact_email,
+            "upgrade_url": f"{upgrade_portal}?report_id={report_id}"
         }
+
 

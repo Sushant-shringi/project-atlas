@@ -78,12 +78,13 @@ def test_critic_rejects_hallucinated_figures():
     retrieved_chunks = [
         {
             "report_id": "R-102",
-            "title": "Smart Metering Technology Excerpt",
+            "title": "Smart Water Metering: Industry Outlook 2024",
             "page": 3,
-            "publisher": "CMR Public",
+            "publisher": "Aquila Insights",
             "scope": "Hardware only",
             "text": "The global smart metering hardware market reached USD 3.87 billion in 2024."
         }
+
     ]
 
     # Valid grounded response
