@@ -1,7 +1,7 @@
 """
 Project Atlas - Evaluation Scenarios Catalog
-Defines 26 real evaluation scenarios, explicitly including all 10 Appendix B questions (AB-Q01 through AB-Q10)
-with exact client assignments (C-01 & C-02), plus 16 comprehensive security, boundary, citation, and operational test cases (TC-11 through TC-26).
+Defines 27 real evaluation scenarios, explicitly including all 10 Appendix B questions (AB-Q01 through AB-Q10)
+with exact client assignments (C-01 & C-02), plus 17 comprehensive security, boundary, citation, and operational test cases (TC-11 through TC-27).
 """
 
 from typing import Any, Dict, List
@@ -104,22 +104,22 @@ EVALUATION_SCENARIOS: List[Dict[str, Any]] = [
     },
     {
         "id": "AB-Q09",
-        "category": "extrapolation_escalation",
-        "client_id": "C-01",
-        "question": "What is the projected smart water meter market size in 2035?",
-        "should_escalate": True,
-        "expected_answer_contains": "Unsupported Extrapolation",
-        "expected_confidence_max": 0.50,
-        "description": "Appendix B Q9: Notes horizon ends 2030, refuses or escalates, states why."
+        "category": "out_of_scope",
+        "client_id": "C-02",
+        "question": "Who will win the next general election?",
+        "should_refuse": True,
+        "expected_refusal_contains": "Out-of-Scope Notice",
+        "description": "Appendix B Q9: Polite out-of-scope refusal with redirect to commercial market intelligence domain."
     },
     {
         "id": "AB-Q10",
-        "category": "escalation",
+        "category": "extrapolation_escalation",
         "client_id": "C-01",
-        "question": "What is the obscure quantum-gravitational water sensor market valuation in 2024?",
+        "question": "What will the market be worth in 2035?",
         "should_escalate": True,
-        "expected_confidence_max": 0.65,
-        "description": "Appendix B Q10: Low confidence or escalation, does not fabricate."
+        "expected_answer_contains": "Unsupported Extrapolation",
+        "expected_confidence_max": 0.50,
+        "description": "Appendix B Q10: Notes horizon ends 2030, refuses or escalates, states why."
     },
 
     # =========================================================================
@@ -263,5 +263,14 @@ EVALUATION_SCENARIOS: List[Dict[str, Any]] = [
         "expected_report": "R-103",
         "expected_value": "9.45",
         "should_refuse": False
+    },
+    {
+        "id": "TC-27",
+        "category": "escalation",
+        "client_id": "C-01",
+        "question": "What is the obscure quantum-gravitational water sensor market valuation in 2024?",
+        "should_escalate": True,
+        "expected_confidence_max": 0.65,
+        "description": "Obscure or ungrounded concept triggers low-confidence analyst escalation without hallucinating."
     }
 ]

@@ -1,6 +1,6 @@
 """
 Project Atlas - Automated Evaluation Suite Runner
-Evaluates the 26 real evaluation scenarios, measuring the 6 PDF primary benchmark metrics:
+Evaluates the 27 real evaluation scenarios, measuring the 6 PDF primary benchmark metrics:
 1. Answer Correctness (target >= 85%)
 2. Citation Accuracy (target >= 90%)
 3. Refusal Accuracy (target 100%)
@@ -295,7 +295,7 @@ def run_evaluation(mode: str = "auto", output_file: str = "evaluation_results.js
     }
 
     # Save to JSON
-    json_path = Path(output_file) if (Path(output_file).is_absolute() or str(output_file).startswith("artifacts")) else Path(__file__).parent / output_file
+    json_path = Path(output_file) if (Path(output_file).is_absolute() or str(output_file).startswith("artifacts") or str(output_file).startswith("eval")) else Path(__file__).parent / output_file
     json_path.parent.mkdir(parents=True, exist_ok=True)
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(evaluation_output, f, indent=2)
