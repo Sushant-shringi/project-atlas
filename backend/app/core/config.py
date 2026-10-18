@@ -49,8 +49,8 @@ class Settings(BaseSettings):
     REQUEST_TIMEOUT_SECONDS: int = 30
 
     # Licensing / Upgrade Paths
-    UPGRADE_CONTACT_EMAIL: str = "licensing@cognitivemarketresearch.com"
-    UPGRADE_PORTAL_URL: str = "https://portal.cognitivemarketresearch.com/upgrade"
+    UPGRADE_CONTACT_EMAIL: str = ""
+    UPGRADE_PORTAL_URL: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -100,15 +100,38 @@ class EntitlementService:
         from app.core.config import settings
         meta = cls.get_report_metadata(report_id)
         title = meta["title"] if meta else f"Report {report_id}"
-        contact_email = os.getenv("UPGRADE_CONTACT_EMAIL", settings.UPGRADE_CONTACT_EMAIL)
-        upgrade_portal = os.getenv("UPGRADE_PORTAL_URL", settings.UPGRADE_PORTAL_URL)
+        contact_email = os.getenv("UPGRADE_CONTACT_EMAIL", settings.UPGRADE_CONTACT_EMAIL) or ""
+        contact_email = contact_email.strip()
+        upgrade_portal = os.getenv("UPGRADE_PORTAL_URL", settings.UPGRADE_PORTAL_URL) or ""
+        upgrade_portal = upgrade_portal.strip()
+        upgrade_url = f"{upgrade_portal}?report_id={report_id}" if upgrade_portal else ""
         return {
             "report_id": report_id,
             "title": title,
             "access_status": "Restricted (Paid Subscription Required)",
             "action": "Request Report License Upgrade",
             "contact_email": contact_email,
-            "upgrade_url": f"{upgrade_portal}?report_id={report_id}"
+            "upgrade_url": upgrade_url
         }
+
+    @classmethod
+    def format_upgrade_instruction(cls, upgrade_info: Dict[str, str]) -> str:
+        """
+        Formats instructions for requesting a report access upgrade.
+        When contact details are configured, provides them.
+        When empty, states access can be requested through the client's CMR account executive or an analyst,
+        with zero invented URL or email.
+        """
+        contact_email = (upgrade_info.get("contact_email") or "").strip()
+        upgrade_url = (upgrade_info.get("upgrade_url") or "").strip()
+
+        if upgrade_url and contact_email:
+            return f"To request access, visit {upgrade_url} or contact {contact_email}."
+        elif contact_email:
+            return f"To request access, contact {contact_email}."
+        elif upgrade_url:
+            return f"To request access, visit {upgrade_url}."
+        else:
+            return "Access can be requested through your CMR account executive or an analyst."
 
 

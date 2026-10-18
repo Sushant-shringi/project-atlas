@@ -105,3 +105,72 @@ def test_entitlement_filtering_c01_can_access_r101():
     # Confirm required market figure is present for C-01
     has_market_figure = any("4.21 billion" in c["text"] for c in r101_chunks)
     assert has_market_figure is True
+
+
+def test_upgrade_contact_details_and_zero_leakage_c02():
+    """
+    Regression Test: For C-02 asking about R-101:
+    1. Any URL or email in the answer must equal a configured value or be absent.
+    2. Prohibited valuation figure 4.21 must NEVER appear.
+    3. When contact config is empty, the fallback text directs to CMR account executive or analyst.
+    """
+    import os
+    import re
+    from app.agent.workflow import AgentWorkflow
+
+    # Case A: When contact details are empty
+    orig_email = os.environ.get("UPGRADE_CONTACT_EMAIL")
+    orig_url = os.environ.get("UPGRADE_PORTAL_URL")
+    try:
+        os.environ["UPGRADE_CONTACT_EMAIL"] = ""
+        os.environ["UPGRADE_PORTAL_URL"] = ""
+
+        res_empty = AgentWorkflow.process_chat(
+            client_id="C-02",
+            question="What was the global smart water meter market size in 2024 according to report R-101?"
+        )
+        ans_empty = res_empty.get("answer", "")
+
+        # Assert no 4.21
+        assert "4.21" not in ans_empty, "Prohibited value 4.21 leaked to C-02"
+
+        # Assert expected fallback wording
+        assert "CMR account executive or an analyst" in ans_empty
+
+        # Assert no email or URL present
+        emails_empty = [em.rstrip(".,;:)") for em in re.findall(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", ans_empty)]
+        urls_empty = [u.rstrip(".,;:)") for u in re.findall(r"https?://\S+", ans_empty)]
+        assert len(emails_empty) == 0, f"Unexpected email found in answer: {emails_empty}"
+        assert len(urls_empty) == 0, f"Unexpected URL found in answer: {urls_empty}"
+
+        # Case B: When contact details are configured
+        os.environ["UPGRADE_CONTACT_EMAIL"] = "licensing@example.com"
+        os.environ["UPGRADE_PORTAL_URL"] = "https://example.com/atlas/request-access"
+
+        res_configured = AgentWorkflow.process_chat(
+            client_id="C-02",
+            question="What was the global smart water meter market size in 2024 according to report R-101?"
+        )
+        ans_configured = res_configured.get("answer", "")
+
+        assert "4.21" not in ans_configured
+
+        emails_conf = [em.rstrip(".,;:)") for em in re.findall(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", ans_configured)]
+        urls_conf = [u.rstrip(".,;:)") for u in re.findall(r"https?://[^\s)\]]+", ans_configured)]
+
+        for em in emails_conf:
+            assert em == "licensing@example.com", f"Invented email found: {em}"
+        for u in urls_conf:
+            assert u.startswith("https://example.com/atlas/request-access"), f"Invented URL found: {u}"
+
+    finally:
+        # Restore environment
+        if orig_email is not None:
+            os.environ["UPGRADE_CONTACT_EMAIL"] = orig_email
+        else:
+            os.environ.pop("UPGRADE_CONTACT_EMAIL", None)
+
+        if orig_url is not None:
+            os.environ["UPGRADE_PORTAL_URL"] = orig_url
+        else:
+            os.environ.pop("UPGRADE_PORTAL_URL", None)
