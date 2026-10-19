@@ -65,5 +65,9 @@ Desktop.ini
 # Temporary files
 tmp/
 temp/
-artifacts/
+artifacts/*
+!artifacts/demo/
+artifacts/demo/audio/
+artifacts/demo/segments/
+artifacts/demo/verified_frames/
 

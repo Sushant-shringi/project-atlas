@@ -1,51 +1,36 @@
-# Project Atlas — What I Would Do With One More Week
+# What I would do with one more week.
 
-**Author:** Sushant Shringi  
-**Target Role:** AI Software Developer — Generative & Agentic AI, Cognitive Market Research & Consulting (CMR)  
-**Scope:** 1-Page Architectural Evolution Roadmap
+**Author:** Senior Software & AI Engineer  
+**Project:** Project Atlas — Entitlement-Aware Retrieval Engine  
+**Date:** October 2026  
 
----
+With one additional week on Project Atlas, I would focus entirely on hardening system reliability, defense-in-depth security, regression testing rigor, and operator observability rather than hastily introducing speculative features. Project Atlas already possesses a sound architectural foundation—an entitlement-filtered vector retrieval layer, a LangGraph multi-node state machine, strict non-averaging conflict detection, prompt-injection sanitization, and human-in-the-loop analyst escalation. An extra week provides the runway to transform this functional prototype into an enterprise-grade, audit-ready production system.
 
-Given an additional week of dedicated engineering time, I would advance Project Atlas from its current production-ready MVP into an enterprise-scale, autonomous intelligence platform along five strategic dimensions:
+### 1. Strengthen Security
+* **Granular Chunk-Level Entitlements:** Extend authorization enforcement beyond document-level IDs to include chunk-level classification tags, licensing tier restrictions, and time-based access leases directly inside Qdrant payload filters.
+* **Semantic Defense-in-Depth for Prompt Injection:** Complement existing regex and heuristic sanitizers with dedicated semantic guard models (e.g., Llama-Guard / NeMo Guardrails) and enforce strict XML tag sandboxing and JSON response schemas for Gemini outputs to eliminate prompt-leakage risks.
+* **Production Secret Management:** Migrate MySQL, JWT, and Gemini API credentials from local `.env` files into an enterprise vault (e.g., AWS Secrets Manager or HashiCorp Vault) featuring automated credential rotation and least-privilege service-account scoping.
 
----
+### 2. Improve Evaluation and Testing
+* **Expanded Evaluation Corpus:** Scale the automated test suite from 27 to 100+ domain-specific evaluation scenarios, incorporating multi-document ambiguities, currency conversions, and complex historical revision queries.
+* **Automated Multi-Tenant Fuzzing:** Implement continuous red-team fuzz testing where virtual clients with conflicting entitlement policies execute concurrent requests, verifying zero cross-tenant vector contamination under heavy load.
+* **Deterministic LLM-as-a-Judge Benchmarking:** Introduce automated citation fidelity scoring (verifying exact character-span offsets against ingested report PDFs) and strict refusal compliance metrics, locking in a target 100% pass rate in CI pipelines.
 
-### 1. Hybrid Sparse-Dense Retrieval with Reciprocal Rank Fusion (RRF)
-- **Current State:** Dense vector embeddings using SentenceTransformers `all-MiniLM-L6-v2` with cosine distance in Qdrant.
-- **Limitation:** Dense embeddings capture high-level semantic intent well but occasionally suffer recall degradation on exact domain-specific acronyms, regulatory standards, and niche equipment codes (e.g., *AMR vs. AMI*, *LoRaWAN*, *EN 1434*, *DN15/DN20 meters*).
-- **Roadmap:** Implement hybrid retrieval combining lexical BM25 (or Qdrant's sparse vector indexing) with dense embeddings, merged using Reciprocal Rank Fusion (RRF):
-  $$RRF(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}$$
-  This guarantees exact keyword fidelity for industry jargon while retaining deep semantic matching for conversational queries.
+### 3. Improve Reliability and Observability
+* **End-to-End Distributed Tracing:** Instrument the LangGraph workflow with OpenTelemetry spans across query rewrites, Qdrant payload filtering, Gemini generation, and critic scoring to profile p95/p99 latency bottlenecks.
+* **Real-Time Operational Dashboards:** Expose Prometheus metrics and Grafana dashboards tracking token consumption, per-client API costs, escalation rates, and critic confidence score distributions.
+* **Fault-Tolerant Fallback & Resilient Queues:** Implement automated model fallback for Gemini rate limits or transient outages, and transition analyst escalation tickets from synchronous database writes to durable message brokers (e.g., RabbitMQ or Redis Streams).
 
----
+### 4. Refine the User Experience
+* **Enhanced Visual Conflict Presentation:** Upgrade the CodeIgniter 3 frontend with side-by-side comparative conflict cards that visually contrast conflicting report methodologies, sample sizes, and publisher assumptions without averaging numbers.
+* **Self-Service Entitlement Workflows:** Replace static licensing contact notices with an interactive "Request Report Access" modal that submits permission requests directly into an administrative review queue.
+* **Synchronized In-Context Document Viewer:** Enable citation links to open an embedded side-panel PDF reader that jumps directly to the highlighted source page and paragraph in the corresponding research publication.
 
-### 2. Multi-Hop Query Decomposition with LangGraph Stateful Workflows
-- **Current State:** Single-turn deterministic router and critic orchestrating retrieval, calculation, and conflict detection.
-- **Roadmap:** Transition the orchestration pipeline to a stateful LangGraph agent graph featuring:
-  - **Query Decomposition:** Breaking complex client queries (e.g., *"Compare the 2030 market size of APAC smart water meters with EMEA residential purifiers and evaluate CAGR differences"*) into sub-queries.
-  - **Self-Corrective RAG (CRAG):** Introducing an automated document grader node that evaluates retrieval quality before generation; if retrieved chunks score below relevance thresholds, the agent reformulates search terms autonomously.
-  - **Human-in-the-Loop Analyst Dashboard:** An interactive review interface where CMR senior research analysts can claim, review, edit, and resolve pending `escalation_tickets` directly from MySQL.
-
----
-
-### 3. Modernized Identity Architecture & Multi-Tenant Namespace Isolation
-- **Current State:** API key authentication mapped to Client IDs with pre-retrieval Boolean payload filters.
-- **Roadmap:**
-  - Implement an OAuth2 / OpenID Connect authorization server issuing cryptographically signed JWTs with fine-grained claim scopes (`reports:read`, `calculations:run`, `escalations:write`).
-  - Introduce physical tenant isolation in Qdrant through tenant-partitioned namespaces or dedicated client collection shards, ensuring cryptographic and physical partition boundaries for high-compliance enterprise clients.
+### 5. Final Validation and Documentation
+* **Single-Command Production Deployment:** Package the full multi-tier architecture (FastAPI, Qdrant, MySQL, Apache/PHP 8.2 CI3) with unified Docker Compose health checks, automated database migrations, and pre-indexed vector data.
+* **Clean-Slate Reproducibility Verification:** Validate the end-to-end setup script on pristine Windows and Linux instances with zero cached state, logging automated smoke test harnesses and performance baselines.
+* **Comprehensive Operator Runbook:** Author an operator and triage manual detailing vector index re-indexing procedures, embedding model upgrades, escalation dispatch workflows, and disaster recovery runbooks.
 
 ---
-
-### 4. Real-Time Streaming Citations & Server-Sent Events (SSE)
-- **Current State:** Synchronous HTTP POST request from CodeIgniter 3 to FastAPI, returning complete JSON payloads.
-- **Roadmap:**
-  - Implement Server-Sent Events (SSE) streaming on `/chat/stream` in FastAPI.
-  - Update CodeIgniter 3 portal frontend to render token-by-token streaming responses with inline citation footnote badges appearing dynamically as facts are validated by the critic.
-
----
-
-### 5. Automated Multimodal PDF Ingestion Pipeline
-- **Current State:** Structured Markdown and text document ingestion with regex page preservation and prompt injection sanitization.
-- **Roadmap:**
-  - Build an asynchronous document ingestion worker (Celery / Redis) supporting raw publisher PDFs.
-  - Integrate layout-aware document parsers (Docling / Unstructured.io) to extract complex financial tables directly into structured Markdown and relational `market_metrics` rows, preserving footnoted methodology notes and multi-column layouts across report pages.
+**Definition of Success:**  
+After this additional week, success is defined not by lines of code written, but by operational peace of mind: zero unauthorized data leaks under adversarial red-teaming, sub-second p95 retrieval latency, verified 100% citation precision, and a seamless, one-command deployment pipeline that any DevOps engineer can spin up with total confidence.

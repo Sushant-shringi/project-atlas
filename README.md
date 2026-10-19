@@ -5,11 +5,9 @@
 [![MySQL 8.0](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://www.mysql.com/)
 [![Qdrant](https://img.shields.io/badge/Qdrant-v1.12-red.svg)](https://qdrant.tech/)
 [![CodeIgniter 3](https://img.shields.io/badge/CodeIgniter-3.1.13-firebrick.svg)](https://codeigniter.com/)
- HEAD
-[![Tests](https://img.shields.io/badge/Tests-52%20Passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-52%20Collected-brightgreen.svg)](tests/)
 [![Pytest](https://img.shields.io/badge/Pytest-49%20Passed-brightgreen.svg)](tests/)
 [![Evaluation Scenarios](https://img.shields.io/badge/Evaluation%20Scenarios-27%2F27%20Passed-success.svg)](eval/)
- ff8ff07 (fix(security): enforce public excerpt retrieval boundary)
 [![Entitlement Leakage](https://img.shields.io/badge/Entitlement%20Leakage-0.0%25-success.svg)](eval/)
 
 **Project Atlas** is an enterprise-grade, entitlement-aware Market Research Report Copilot engineered for **Cognitive Market Research & Consulting (CMR)** and integrated seamlessly with a legacy **CodeIgniter 3** enterprise client portal.
@@ -149,11 +147,8 @@ pip install -r backend/requirements.txt
 # 3. Copy sample environment
 cp .env.example .env
 
-HEAD
-# 4. Run automated test suite (52 tests)
 
-# 4. Run automated pytest suite (52 tests collected and passing)
- ff8ff07 (fix(security): enforce public excerpt retrieval boundary)
+# 4. Run automated pytest suite (52 tests collected; 49 passed in baseline run)
 pytest -v
 
 # 5. Run the 27-scenario evaluation benchmark suite
@@ -275,32 +270,35 @@ python -m pytest -v
 python eval/run_eval.py
 ```
 
-### Test Suite Structure (52 Tests Passed)
+### Test Suite Structure (52 Tests Collected | 49 Verified Passed)
 
-The latest full pytest execution reported **52 passed** (with 2 non-breaking third-party library warnings: a Qdrant client-server minor version notice and a LangGraph checkpoint JSON serializer deprecation warning):
+The test suite contains **52 collected tests** across 8 modules. In the last complete execution of the full test suite, **49 tests passed** (with 2 non-breaking third-party library warnings: a Qdrant client-server minor version notice and a LangGraph checkpoint JSON serializer deprecation warning). Three additional regression tests enforcing the public-excerpt boundary were individually verified in isolated test passes:
 
 - `tests/test_agent_tools.py` (6 tests): CAGR calculation math, extrapolation bounds, safe SQL tool analytical queries, destructive SQL rejection, conflict detector (R-101 vs R-102), query router.
 - `tests/test_api.py` (7 tests): `/health` endpoint status, 401 unauthenticated request rejection, 403 client spoofing defense, successful factual flow contract, `/ingest` admin authorization, `/escalations` retrieval, `/feedback` persistence.
 - `tests/test_cache_and_sql_limits.py` (9 tests): Derived values explicit multi-period disclosure, tenant and entitlement cache isolation, cache invalidation on entitlement changes, workflow cross-tenant isolation, SQL write rejection, DDL/DCL rejection, multi-statement injection rejection, sensitive table access rejection, 50-row bounds limit.
-- `tests/test_entitlements.py` (5 tests): Client API key verification, spoofing defense, entitlements resolution, C-02 entitlement restriction on R-101, C-01 access to R-101, upgrade contact details and zero leakage.
+- `tests/test_entitlements.py` (7 tests): Client API key verification, spoofing defense, entitlements resolution, C-02 entitlement restriction on R-101, C-01 access to R-101, upgrade contact details and zero leakage, Qdrant query filter boundary, and runtime non-excerpt exclusion.
 - `tests/test_evaluation_suite.py` (1 test): Pytest wrapper asserting evaluation baseline pass rate >= 80%.
 - `tests/test_gemini_writer.py` (9 tests): Prompt leakage defense, critic rejection of hallucinated figures, workflow fallback on critic rejection, zero fabricated counts on fallback, modern `google-genai` success flow, provider error retries & fallback, secret & raw response logging defense, prompt injection directive sanitization preserving factual data, production configuration credential validation.
-- `tests/test_ingestion.py` (4 tests): Document ingestion, R-101 page 8 parsing preservation, R-102 prompt injection detection, vector ingestion into Qdrant, embeddings generation.
+- `tests/test_ingestion.py` (5 tests): Document ingestion, R-101 page 8 parsing preservation, R-102 prompt injection detection, vector ingestion into Qdrant, embeddings generation, and public-excerpt page-15 boundary enforcement.
 - `tests/test_workflow.py` (8 tests): End-to-end agent workflow, factual lookup for C-01, derived calculation (APAC 2030), unsupported extrapolation escalation (2035), conflict detection (R-101 vs R-102), entitlement refusal for C-02, SQL analytical querying, prompt injection refusal, out-of-scope refusals.
 
 ---
 
 ## 📚 Deliverables & Documentation Index
 
-All assignment deliverables, design records, and walkthrough scripts are organized in the `docs/` directory:
+All assignment deliverables, design records, and walkthrough scripts are organized in the `docs/` and `artifacts/demo/` directories:
 
 1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Detailed system architecture, data flows, threat model, and privilege boundaries.
-2. [docs/EVALUATION_REPORT.md](docs/EVALUATION_REPORT.md): Evaluation benchmark report, 27-scenario matrix, and the **Detailed Failure Analyses** (Section 19).
+2. [docs/EVALUATION_REPORT.md](docs/EVALUATION_REPORT.md): Evaluation benchmark report, 27-scenario matrix, and the **Detailed Failure Analyses** (Section 5 / Requirement 19).
 3. [docs/E2E_TEST_REPORT.md](docs/E2E_TEST_REPORT.md): Comprehensive End-to-End Test and Verification Report, raw terminal proofs for live Gemini token/cost logging, CI3 portal browser workflow, 27-scenario pass matrix, and clean-start benchmarks.
 4. [docs/CI3_VERIFICATION.md](docs/CI3_VERIFICATION.md): Verification matrix for CodeIgniter 3 CSRF, server-side session identity, XSS escaping, timeout resilience, and cURL proofs.
-5. [docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md](docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md): 1-page engineering evolution roadmap (Hybrid RRF search, LangGraph CRAG, OAuth2 PKCE).
+5. [docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md](docs/WHAT_I_WOULD_DO_WITH_ONE_MORE_WEEK.md): 1-page engineering evolution roadmap (Markdown) & [docs/what_i_would_do_with_one_more_week.pdf](docs/what_i_would_do_with_one_more_week.pdf) (verified 1-page PDF).
 6. [docs/AI_DISCLOSURE.md](docs/AI_DISCLOSURE.md): Transparent disclosure of AI assistant usage and human engineering verification.
 7. [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md): 3–5 minute step-by-step video demonstration script for reviewers.
+8. [artifacts/demo/project_atlas_demo.mp4](artifacts/demo/project_atlas_demo.mp4): Full 1080p demo video (**4m 37s**, audible voice-over narration, synchronized burned-in subtitles).
+9. [artifacts/demo/project_atlas_demo.srt](artifacts/demo/project_atlas_demo.srt): Synchronized subtitle file (24 cues).
+10. [artifacts/demo/demo_validation.md](artifacts/demo/demo_validation.md): Demonstration validation report, reproduction steps, and verified scenario metrics.
 
 ---
 
